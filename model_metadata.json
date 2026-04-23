@@ -1,0 +1,8 @@
+{
+  "seq_len": 30,
+  "feature_dim": 126,
+  "label_smoothing": 0.03,
+  "augment_mirror": true,
+  "augment_jitter_std": 0.015,
+  "augment_copies": 1
+}

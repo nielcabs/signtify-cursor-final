@@ -1,0 +1,358 @@
+/* ============================================
+   DUOLINGO-STYLE ANIMATIONS
+   ============================================ */
+
+/* Keyframe Animations */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-2deg);
+  }
+  75% {
+    transform: rotate(2deg);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-2px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes scale-in {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Button Hover Animations - Duolingo Style */
+button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+button:hover {
+  transform: scale(1.03) translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
+}
+
+button:active {
+  transform: scale(0.95);
+  animation: none;
+}
+
+/* Ripple Effect on Click */
+button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+button:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Primary Button Glow */
+button:not(.secondary):not(.control-btn):not(.clear-btn):hover {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Secondary Button Wiggle */
+button.secondary:hover {
+  transform: scale(1.02) translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+/* CTA Button Special Animation */
+.cta-button {
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.cta-button:hover {
+  animation: pulse-glow 2s infinite;
+  transform: scale(1.05) translateY(-3px);
+  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
+}
+
+/* Card Animations */
+.card {
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  animation: scale-in 0.5s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15);
+}
+
+/* Feature Card Special Hover */
+.feature-card:hover {
+  animation: none;
+}
+
+.feature-card:hover .feature-icon {
+  transform: scale(1.1);
+  transition: transform 0.3s ease;
+}
+
+/* Nav Link Animations */
+.nav-link {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  background: var(--primary-green);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 80%;
+}
+
+.nav-link:hover {
+  transform: translateY(-2px);
+}
+
+/* Stat Numbers Animation */
+.stat-number {
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.stat-item:hover .stat-number {
+  color: var(--primary-green-dark);
+  transform: scale(1.08);
+}
+
+/* History Item Slide Animation */
+.history-item {
+  animation: slide-up 0.4s ease;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.history-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+
+/* Control Button Hover */
+.control-btn:hover {
+  transform: scale(1.03) translateY(-2px);
+}
+
+/* Start Camera Button Special Effect */
+.start-camera-btn {
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+}
+
+.start-camera-btn:hover {
+  animation: pulse-glow 2s infinite;
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+}
+
+/* Clear Button Hover */
+.clear-btn:hover {
+  transform: scale(1.02);
+}
+
+/* Placeholder Icon Float */
+.placeholder-icon {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Status Badge Pulse */
+.status-badge {
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.status-badge:hover {
+  animation: pop 0.4s ease;
+  transform: scale(1.1);
+}
+
+/* Dropdown Menu Slide */
+.dropdown-menu {
+  animation: none;
+}
+
+.dropdown-menu a {
+  transition: all 0.2s ease;
+}
+
+.dropdown-menu a:hover {
+  transform: translateX(4px);
+}
+
+/* Logo Wiggle on Hover */
+.nav-logo {
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.nav-logo:hover {
+  transform: scale(1.03);
+}
+
+.nav-logo:hover .logo-icon {
+  transform: scale(1.05);
+  transition: transform 0.3s ease;
+}
+
+/* Feature Icon Bounce */
+.feature-icon {
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  display: inline-block;
+}
+
+/* Confidence Bar Animation */
+.confidence-fill {
+  transition: width 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+  overflow: hidden;
+}
+
+.confidence-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* Mobile Menu Slide Animation */
+@media (max-width: 768px) {
+  .nav-menu {
+    animation: slide-up 0.3s ease;
+  }
+}
+
+/* Stagger Animation for Feature Cards */
+.feature-card:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.feature-card:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.feature-card:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.feature-card:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.feature-card:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

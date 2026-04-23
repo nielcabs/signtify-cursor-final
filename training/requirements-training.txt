@@ -1,0 +1,9 @@
+# Use the same venv as the Flask app (see project requirements.txt for TensorFlow).
+# pip install -r requirements.txt -r training/requirements-training.txt
+#
+# If `import tensorflow` fails after installing mediapipe, upgrade protobuf:
+#   pip install "protobuf>=6.31.1,<8"
+opencv-python-headless>=4.8.0
+mediapipe>=0.10.30
+scikit-learn>=1.3.0
+pymupdf>=1.24.0

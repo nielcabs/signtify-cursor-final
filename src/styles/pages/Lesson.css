@@ -1,0 +1,679 @@
+.lesson-page {
+  width: 100%;
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lesson-header {
+  text-align: center;
+  margin-bottom: 3rem;
+  padding: 3rem 2rem;
+  background: #1CB0F6;
+  border-radius: 24px;
+  color: white;
+}
+
+.lesson-header h1 {
+  color: white;
+  margin-bottom: 1rem;
+  font-size: 3rem;
+  font-weight: 800;
+}
+
+.lesson-header p {
+  color: white;
+  font-size: 1.3rem;
+  opacity: 0.95;
+}
+
+.lesson-content {
+  margin-bottom: 2rem;
+}
+
+.letter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 1rem;
+  margin-bottom: 3rem;
+}
+
+.letter-button {
+  position: relative;
+  aspect-ratio: 1;
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: white;
+  color: #2B2B2B;
+  border: 3px solid #E5E5E5;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.letter-button:hover {
+  border-color: #58CC02;
+  background: #F0FFF0;
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 6px 16px rgba(88, 204, 2, 0.2);
+}
+
+.letter-button.active {
+  background: #58CC02;
+  color: white;
+  border-color: #58CC02;
+  box-shadow: 0 4px 0 #4AAD00;
+  transform: translateY(-2px);
+}
+
+.letter-button.locked {
+  background: #F5F5F5;
+  color: #999;
+  border-color: #DDD;
+  cursor: not-allowed;
+  opacity: 0.6;
+  position: relative;
+}
+
+.letter-button.locked:hover {
+  transform: none;
+  border-color: #DDD;
+  background: #F5F5F5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.letter-button.viewed {
+  border-color: #4CAF50;
+  background: #F0FFF4;
+}
+
+.letter-button.viewed .check-icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.8rem;
+  color: #4CAF50;
+  background: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.letter-button.locked .lock-icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.8rem;
+}
+
+.letter-button.letter-tile-with-svg {
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.letter-button .letter-tile-svg {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+.greeting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.greeting-button {
+  padding: 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: white;
+  color: #2B2B2B;
+  border: 3px solid #E5E5E5;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.greeting-button:hover:not(.locked) {
+  border-color: #1CB0F6;
+  background: #E8F7FF;
+}
+
+.greeting-button.locked {
+  background: #F5F5F5;
+  color: #999;
+  border-color: #DDD;
+  cursor: not-allowed;
+  opacity: 0.6;
+  position: relative;
+}
+
+.greeting-button.locked:hover {
+  transform: none;
+  border-color: #DDD;
+  background: #F5F5F5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.greeting-button.viewed {
+  border-color: #4CAF50;
+  background: #F0FFF4;
+}
+
+.greeting-button.viewed .check-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9rem;
+  color: #4CAF50;
+  background: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.greeting-button.locked .lock-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9rem;
+}
+
+.greeting-button:hover:not(.locked) {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(28, 176, 246, 0.2);
+}
+
+.greeting-button.active {
+  background: linear-gradient(135deg, #1CB0F6, #0E8AC7);
+  color: white;
+  border-color: #1CB0F6;
+  box-shadow: 0 4px 0 #0E8AC7;
+  transform: translateY(-2px);
+}
+
+.sign-display {
+  padding: 3rem;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.sign-display h2 {
+  text-align: center;
+  color: #2B2B2B;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.sign-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 350px;
+  background: linear-gradient(135deg, #F0FFF0, #E0F8E0);
+  border-radius: 20px;
+  margin-bottom: 2rem;
+  border: 3px solid #58CC02;
+  position: relative;
+  overflow: hidden;
+}
+
+.sign-visual::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(88, 204, 2, 0.1) 0%, transparent 70%);
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.8;
+  }
+}
+
+.sign-placeholder {
+  text-align: center;
+  font-size: 7rem;
+  color: #58CC02;
+  animation: bounce 2s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.sign-placeholder .sign-letter-a-svg,
+.sign-placeholder .sign-letter-svg {
+  width: 200px;
+  height: 280px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  margin: 0 auto;
+}
+
+.sign-placeholder .sign-number-svg.sign-number-rotated {
+  width: 280px;
+  height: 200px;
+  transform: rotate(90deg);
+  transform-origin: center;
+}
+
+.sign-placeholder .sign-letter-svg.sign-letter-i {
+  width: 120px;
+  height: 168px;
+}
+
+.sign-placeholder .sign-letter-svg.sign-letter-h {
+  width: 240px;
+  height: 336px;
+}
+
+.sign-placeholder .sign-placeholder-emoji {
+  display: inline-block;
+}
+
+.sign-placeholder p {
+  font-size: 1.3rem;
+  color: #555;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.sign-description {
+  text-align: left;
+  padding: 2rem 2.5rem;
+  margin: 0 1.5rem;
+  background: #F7F7F7;
+  border-radius: 16px;
+}
+
+.sign-description h3 {
+  color: #2B2B2B;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sign-description p {
+  color: #555;
+  line-height: 1.8;
+  max-width: 100%;
+  margin: 0 0 1rem 0;
+  font-size: 1.05rem;
+}
+
+.sign-description p:last-child {
+  margin-bottom: 0;
+}
+
+.sign-description .sign-steps {
+  text-align: left;
+  max-width: 100%;
+  margin: 1rem 0 1.25rem;
+  padding-left: 1.5rem;
+  color: #555;
+  line-height: 1.8;
+  font-size: 1.05rem;
+}
+
+.sign-description .sign-steps li {
+  margin-bottom: 0.5rem;
+}
+
+.lesson-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 3rem;
+}
+
+.lesson-actions button {
+  padding: 1rem 2.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: none;
+}
+
+.lesson-actions button:first-child {
+  background: #58CC02;
+  color: white;
+  box-shadow: 0 4px 0 #4AAD00;
+}
+
+.lesson-actions button:first-child:hover {
+  background: #58CC02;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #4AAD00;
+}
+
+.lesson-actions button.secondary {
+  background: linear-gradient(135deg, #1CB0F6, #0E8AC7);
+  color: white;
+  box-shadow: 0 4px 0 #0E8AC7;
+}
+
+.lesson-actions button.secondary:hover {
+  background: linear-gradient(135deg, #0E8AC7, #0A6B9E);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #0A6B9E;
+}
+
+.lesson-complete-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.complete-btn {
+  background: #58CC02 !important;
+  color: white !important;
+  padding: 1rem 2.5rem !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  border-radius: 16px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 4px 0 #4AAD00 !important;
+}
+
+.complete-btn:hover {
+  background: #4AAD00 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 0 #4AAD00 !important;
+}
+
+.completed-message {
+  background: #58CC02;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 4px 0 #4AAD00;
+}
+
+.practice-btn {
+  background: linear-gradient(135deg, #1CB0F6, #0E8AC7) !important;
+  color: white !important;
+  padding: 1rem 2rem !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  border-radius: 16px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-decoration: none !important;
+  display: inline-block !important;
+  box-shadow: 0 4px 0 #0E8AC7 !important;
+}
+
+.practice-btn:hover {
+  background: linear-gradient(135deg, #0E8AC7, #0A6B9E) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 0 #0A6B9E !important;
+}
+
+.sign-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.sign-button {
+  padding: 1rem;
+  background: white;
+  color: #2B2B2B;
+  border: 3px solid #E5E5E5;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.sign-button:hover:not(.locked) {
+  border-color: #1CB0F6;
+  background: #E8F7FF;
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(28, 176, 246, 0.2);
+}
+
+.sign-button.active {
+  background: #1CB0F6;
+  color: white;
+  border-color: #1CB0F6;
+  box-shadow: 0 4px 0 #0E8AC7;
+}
+
+.sign-button.locked {
+  background: #F5F5F5;
+  color: #999;
+  border-color: #DDD;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sign-button.locked:hover {
+  transform: none;
+  border-color: #DDD;
+  background: #F5F5F5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.sign-button.viewed {
+  border-color: #4CAF50;
+  background: #F0FFF4;
+}
+
+.sign-button.viewed .check-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9rem;
+  color: #4CAF50;
+  background: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sign-button.locked .lock-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9rem;
+}
+
+.sign-icon {
+  font-size: 2rem;
+}
+
+.sign-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Letter Instructions Styles */
+.letter-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.handshape-summary {
+  font-size: 1.05rem;
+  color: #333;
+  background: #EAF6FF;
+  border-left: 4px solid #1CB0F6;
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+  margin: 0 !important;
+}
+
+.instruction-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #E5E5E5;
+}
+
+.instruction-section h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.steps-list {
+  padding-left: 1.5rem;
+  margin: 0;
+  color: #444;
+  line-height: 1.9;
+  font-size: 1rem;
+}
+
+.steps-list li {
+  margin-bottom: 0.4rem;
+  padding-left: 0.25rem;
+}
+
+.steps-list li::marker {
+  color: #58CC02;
+  font-weight: 700;
+}
+
+.tips-section {
+  border-left: 4px solid #FFD700;
+  background: #FFFDF0;
+}
+
+.tips-section h4 {
+  color: #B8860B;
+}
+
+.tips-list {
+  padding-left: 1.5rem;
+  margin: 0;
+  color: #555;
+  line-height: 1.9;
+  font-size: 1rem;
+  list-style-type: disc;
+}
+
+.tips-list li {
+  margin-bottom: 0.4rem;
+}
+
+.mistakes-section {
+  border-left: 4px solid #FF4B4B;
+  background: #FFF5F5;
+}
+
+.mistakes-section h4 {
+  color: #CC0000;
+}
+
+.common-mistakes {
+  color: #555;
+  line-height: 1.8;
+  font-size: 1rem;
+  margin: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .letter-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .greeting-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .sign-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .sign-visual {
+    min-height: 200px;
+  }
+
+  .sign-placeholder {
+    font-size: 3rem;
+  }
+
+  .instruction-section {
+    padding: 1rem;
+  }
+
+  .steps-list,
+  .tips-list {
+    font-size: 0.95rem;
+  }
+}

@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Momo+Trust+Display&display=swap');
+
+:root {
+  /* Duolingo Green Color Palette */
+  --primary-green: #58CC02;
+  --primary-green-dark: #4AAD00;
+  --primary-green-light: #6FE724;
+  --secondary-green: #58CC02;
+  --accent-green: #6FE724;
+  --bg-light: #f0fdf4;
+  --bg-white: #ffffff;
+  --text-dark: #1f2937;
+  --text-gray: #6b7280;
+  --text-light: #9ca3af;
+  --border-color: #d1fae5;
+  --shadow: rgba(16, 185, 129, 0.1);
+  
+  font-family: 'Momo Trust Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  
+  color: var(--text-dark);
+  background-color: var(--bg-light);
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-light);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-dark);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+a {
+  color: var(--primary-green);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: var(--primary-green-dark);
+}
+
+button {
+  border-radius: 8px;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--primary-green);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+button:hover {
+  background-color: var(--primary-green-dark);
+}
+
+button:disabled {
+  background-color: var(--text-light);
+  cursor: not-allowed;
+  transform: none;
+  animation: none !important;
+}
+
+button.secondary {
+  background-color: white;
+  color: var(--primary-green);
+  border: 2px solid var(--primary-green);
+}
+
+button.secondary:hover {
+  background-color: var(--bg-light);
+}
+
+input, select, textarea {
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.3s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary-green);
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px var(--shadow);
+}

@@ -1,0 +1,103 @@
+.action-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.action-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.action-menu-trigger:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+.action-menu-trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.action-menu-arrow {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.action-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  min-width: 180px;
+  padding: 0.35rem 0;
+  margin: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+  z-index: var(--z-dropdown);
+  animation: actionMenuIn 0.12s ease-out;
+}
+
+.action-menu-align-right { right: 0; }
+.action-menu-align-left { left: 0; }
+
+@keyframes actionMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.action-menu-item:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.action-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action-menu-item-danger { color: var(--color-danger); }
+.action-menu-item-danger:hover:not(:disabled) { background: rgba(220, 53, 69, 0.08); }
+
+.action-menu-item-warning { color: #b26a00; }
+.action-menu-item-warning:hover:not(:disabled) { background: rgba(255, 193, 7, 0.12); }
+
+.action-menu-item-success { color: var(--color-success-hover); }
+.action-menu-item-success:hover:not(:disabled) { background: rgba(88, 204, 2, 0.1); }
+
+.action-menu-icon {
+  width: 1.1rem;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.action-menu-divider {
+  height: 1px;
+  margin: 0.3rem 0;
+  background: var(--color-border);
+}
