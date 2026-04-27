@@ -34,6 +34,11 @@ export const AuthProvider = ({ children }) => {
   const [role, setRole] = useState(USER_ROLES.STUDENT);
   const [loading, setLoading] = useState(true);
 
+  // Temporary admin bypass controls.
+  // Admin can be bypass-only while teacher/student accounts remain Firebase-backed.
+  const ENABLE_ADMIN_BYPASS = (import.meta.env.VITE_ENABLE_ADMIN_BYPASS ?? 'true') === 'true';
+  const ADMIN_BYPASS_ONLY = (import.meta.env.VITE_ADMIN_BYPASS_ONLY ?? 'true') === 'true';
+
   // Development admin bypass credentials
   const DEV_ADMIN_EMAIL = 'signtifydev@dev.com';
   const DEV_ADMIN_PASSWORD = 'signtifydev';
@@ -89,8 +94,8 @@ export const AuthProvider = ({ children }) => {
   // Login user
   const login = async (email, password) => {
     try {
-      // Development bypass: hardcoded credentials
-      if (email === DEV_ADMIN_EMAIL && password === DEV_ADMIN_PASSWORD) {
+      // Temporary admin bypass credentials
+      if (ENABLE_ADMIN_BYPASS && email === DEV_ADMIN_EMAIL && password === DEV_ADMIN_PASSWORD) {
         startDevSession(email);
         return { user: getDevSessionUser() };
       }
@@ -188,8 +193,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // If dev session exists, prefer it and skip Firebase listener
-    const devUser = getDevSessionUser();
+    // If bypass session exists, prefer it and skip Firebase listener
+    const devUser = ENABLE_ADMIN_BYPASS ? getDevSessionUser() : null;
     if (devUser) {
       setCurrentUser(devUser);
       setIsAdmin(true);
@@ -216,7 +221,8 @@ export const AuthProvider = ({ children }) => {
             }
             const derivedRole = deriveUserRole(data);
             setRole(derivedRole);
-            setIsAdmin(derivedRole === USER_ROLES.ADMIN);
+            // Temporary mode: only bypass credentials can act as admin.
+            setIsAdmin(ADMIN_BYPASS_ONLY ? false : (derivedRole === USER_ROLES.ADMIN));
           } else {
             setRole(USER_ROLES.STUDENT);
             setIsAdmin(false);

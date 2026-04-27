@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { checkIsAdmin } from './adminUtils';
 import './Auth.css';
 
 const Login = () => {
@@ -21,21 +20,10 @@ const Login = () => {
       setLoading(true);
       const userCredential = await login(email, password);
       
-      // Check if user is admin and redirect accordingly
+      // In bypass-only mode, only bypass session should land on /admin.
       const user = userCredential?.user;
-      if (user) {
-        try {
-          const isAdminUser = await checkIsAdmin(user.uid);
-          if (isAdminUser) {
-            navigate('/admin');
-          } else {
-            navigate('/');
-          }
-        } catch (adminCheckError) {
-          // If admin check fails, just redirect to home
-          console.warn('Admin check failed, redirecting to home:', adminCheckError);
-          navigate('/');
-        }
+      if (user?.providerId === 'dev-bypass') {
+        navigate('/admin');
       } else {
         navigate('/');
       }
