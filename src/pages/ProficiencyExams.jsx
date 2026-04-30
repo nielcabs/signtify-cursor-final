@@ -21,7 +21,6 @@ const categoryIcon = (category) => CATEGORY_ICONS[category] || '🎓';
 function ProficiencyExams() {
   const { currentUser } = useAuth();
   const [exams, setExams] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasAnyLessonCompleted, setHasAnyLessonCompleted] = useState(false);
 
@@ -73,11 +72,12 @@ function ProficiencyExams() {
       
       // Load user profile to check which exams are passed
       let passedExams = [];
+      let hasCompletedLesson = false;
       if (currentUser) {
         const profile = await getUserProfile(currentUser.uid);
-        setUserProfile(profile);
-         const completedLessons = profile?.progress?.lessonsCompleted || [];
-         setHasAnyLessonCompleted(completedLessons.length > 0);
+        const completedLessons = profile?.progress?.lessonsCompleted || [];
+        hasCompletedLesson = completedLessons.length > 0;
+        setHasAnyLessonCompleted(hasCompletedLesson);
         passedExams = profile?.progress?.examsPassed || [];
       }
       
@@ -105,7 +105,7 @@ function ProficiencyExams() {
         // Determine if exam is unlocked
         let isUnlocked = false;
         
-        if (!hasAnyLessonCompleted) {
+        if (!hasCompletedLesson) {
           // Global lock until user has completed at least one lesson
           isUnlocked = false;
         } else if (index === 0) {
@@ -193,7 +193,7 @@ function ProficiencyExams() {
         </div>
       ) : (
         <div className="exams-grid">
-          {exams.map((exam, index) => (
+          {exams.map((exam) => (
             <div key={exam.id} className={`exam-card card ${!exam.isUnlocked ? 'locked' : ''} ${exam.isPassed ? 'passed' : ''}`}>
               <div className="exam-status-badges">
                 {!exam.isUnlocked && <span className="lock-badge">🔒 Locked</span>}

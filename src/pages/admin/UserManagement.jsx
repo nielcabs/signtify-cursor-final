@@ -23,6 +23,7 @@ const TABS = [
   { id: 'active', label: 'Active Users' },
   { id: 'archived', label: 'Archived' },
 ];
+const PAGE_SIZE = 10;
 
 const CONFIRM_DEFAULTS = { open: false, loading: false };
 
@@ -35,6 +36,7 @@ function UserManagement() {
   const [archived, setArchived] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -75,6 +77,22 @@ function UserManagement() {
       (u.displayName || '').toLowerCase().includes(term),
     );
   }, [visibleList, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedUsers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, searchTerm]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
@@ -444,7 +462,7 @@ function UserManagement() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((user) => (
+            {paginatedUsers.map((user) => (
               <tr key={user.id} className={isSelf(user) ? 'current-user' : ''}>
                 <td>{user.displayName || 'N/A'}{isSelf(user) && <span className="um-you-tag">you</span>}</td>
                 <td>{user.email}</td>
@@ -472,6 +490,33 @@ function UserManagement() {
                   ? 'No users match your search.'
                   : 'No users found.'}
             </p>
+          </div>
+        )}
+
+        {filtered.length > PAGE_SIZE && (
+          <div className="pagination-controls">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1}-
+              {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            <div className="action-buttons">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

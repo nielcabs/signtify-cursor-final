@@ -15,7 +15,9 @@
 }
 
 .proficiency-header {
-  display: none;
+  display: block;
+  text-align: center;
+  margin: 0 0 1.5rem;
 }
 
 /* Hide only the header content in exam pages, not the progress bar */
@@ -24,16 +26,16 @@
 }
 
 .proficiency-header h1 {
-  color: white;
-  margin-bottom: 1rem;
-  font-size: 3rem;
+  color: #2B2B2B;
+  margin-bottom: 0.5rem;
+  font-size: 2.2rem;
   font-weight: 800;
 }
 
 .proficiency-header p {
-  color: white;
-  font-size: 1.3rem;
-  opacity: 0.95;
+  color: #6B7280;
+  font-size: 1rem;
+  opacity: 1;
 }
 
 .exam-requirements {

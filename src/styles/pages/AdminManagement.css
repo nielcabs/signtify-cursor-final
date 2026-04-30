@@ -347,6 +347,16 @@
   color: #666;
 }
 
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding: 0 1rem 1rem;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
 /* Category Filters */
 .category-filters {
   display: flex;
