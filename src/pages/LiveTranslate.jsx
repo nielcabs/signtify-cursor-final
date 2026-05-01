@@ -35,7 +35,8 @@ function LiveTranslate() {
   const predictionIntervalRef = useRef(null);
   const FLASK_SERVER_URL = (import.meta.env.VITE_FLASK_PREDICT_URL || 'http://127.0.0.1:5000/predict').trim();
   const CONFIDENCE_THRESHOLD_BY_MODE = {
-    letters: 0.35,
+    // Letters: allow slightly lower scores when lighting is poor (fingerpose + model fusion).
+    letters: 0.28,
     numbers: 0.5,
     words: 0.5
   };
@@ -45,8 +46,8 @@ function LiveTranslate() {
     words: 3
   };
   const FINGERPOSE_MATCH_SCORE = 4.8;
-  const FINGERPOSE_MIN_CONFIDENCE = 0.28;
-  const FINGERPOSE_FOLDED_MIN_CONFIDENCE = 0.18;
+  const FINGERPOSE_MIN_CONFIDENCE = 0.22;
+  const FINGERPOSE_FOLDED_MIN_CONFIDENCE = 0.14;
   const LETTER_ONLY_INTERVAL_MS = 180;
   const DEFAULT_INTERVAL_MS = 500;
   const LETTER_VOTE_WINDOW = 8;
@@ -380,8 +381,9 @@ function LiveTranslate() {
       }
 
       // Don't suppress too aggressively; backend already applies quality gates.
-      if (finalSign === 'nothing' && finalConfidence < 0.70) {
-        setDetectionStatus('Show gesture clearly');
+      const nothingMinConf = mode === 'letters' ? 0.48 : 0.70;
+      if (finalSign === 'nothing' && finalConfidence < nothingMinConf) {
+        setDetectionStatus('Show gesture clearly — add light if score stays low');
         setDetectedSign(null);
         setConfidence(0);
         return;
@@ -470,11 +472,13 @@ function LiveTranslate() {
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       });
 
+      // Lower thresholds than default 0.7 so dim rooms still get usable landmarks.
+      // Trade-off: slightly noisier skeleton; letter voting + backend still gate output.
       handsRef.current.setOptions({
         maxNumHands: 2,
-        modelComplexity: 0,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.7
+        modelComplexity: 1,
+        minDetectionConfidence: 0.35,
+        minTrackingConfidence: 0.35
       });
 
       // On results callback
@@ -534,7 +538,7 @@ function LiveTranslate() {
         }
       });
 
-      // Start camera
+      // Start camera (higher resolution helps hand landmarks in dim lighting)
       cameraRef.current = new window.Camera(videoRef.current, {
         onFrame: async () => {
           const video = videoRef.current;
@@ -569,8 +573,8 @@ function LiveTranslate() {
             frameSendInFlightRef.current = false;
           }
         },
-        width: 640,
-        height: 480
+        width: 1280,
+        height: 720
       });
       
       await cameraRef.current.start();
@@ -874,7 +878,8 @@ function LiveTranslate() {
               <li>Keep hand <strong>steady for 2-3 seconds</strong></li>
               <li>Avoid cluttered backgrounds</li>
               <li>Wait for "Detected" status</li>
-              <li>Min confidence: <strong>70%</strong></li>
+              <li>Letter mode accepts roughly <strong>28%+</strong> when shapes stabilize; numbers/words need higher scores</li>
+              <li>If it stays red: turn on a lamp behind the camera (face lighting), not only screen brightness</li>
             </ul>
           </div>
         </div>
