@@ -2,6 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import '../styles/pages/Dictionary.css';
+import helloImg from '../../ASL pics/Greetings/Hello-removebg-preview.png';
+import goodbye1 from '../../ASL pics/Greetings/Goodbye1-removebg-preview.png';
+import thankYou1 from '../../ASL pics/Greetings/TY_1-removebg-preview.png';
+import happyBirthday1 from '../../ASL pics/Greetings/Happy Birthday 1.png';
+import mamaImg from '../../ASL pics/Greetings/Mama-removebg-preview.png';
+import yesImg from '../../ASL pics/Daily Conversations/Yes.png';
+import no1Img from '../../ASL pics/Daily Conversations/No_1.png';
+import helpImg from '../../ASL pics/Daily Conversations/Help.png';
 
 const alphabetSvgModules = import.meta.glob('../../ASL pics/Alphabets_SVG/*.svg*', {
   eager: true,
@@ -16,6 +24,17 @@ const alphabetSvgMap = Object.entries(alphabetSvgModules).reduce((acc, [path, as
   }
   return acc;
 }, {});
+
+const WORD_IMAGE_MAP = {
+  Hello: helloImg,
+  Goodbye: goodbye1,
+  'Thank You': thankYou1,
+  'Happy Birthday': happyBirthday1,
+  Mama: mamaImg,
+  Yes: yesImg,
+  No: no1Img,
+  Help: helpImg,
+};
 
 function Dictionary() {
   const { currentUser } = useAuth();
@@ -88,6 +107,12 @@ function Dictionary() {
     return alphabetSvgMap[word] || null;
   };
 
+  const getWordImage = (word, category) => {
+    const alphabetImage = getAlphabetImage(word, category);
+    if (alphabetImage) return alphabetImage;
+    return WORD_IMAGE_MAP[word] || null;
+  };
+
   if (!currentUser) {
     navigate('/');
     return null;
@@ -133,9 +158,9 @@ function Dictionary() {
                 onClick={() => setSelectedWord(item)}
               >
                 <div className="word-icon">
-                  {getAlphabetImage(item.word, item.category) ? (
+                  {getWordImage(item.word, item.category) ? (
                     <img
-                      src={getAlphabetImage(item.word, item.category)}
+                      src={getWordImage(item.word, item.category)}
                       alt={`ASL ${item.word}`}
                       className="dictionary-alphabet-icon"
                     />
@@ -164,9 +189,9 @@ function Dictionary() {
             
             <div className="sign-visual">
               <div className="sign-placeholder">
-                {getAlphabetImage(selectedWord.word, selectedWord.category) ? (
+                {getWordImage(selectedWord.word, selectedWord.category) ? (
                   <img
-                    src={getAlphabetImage(selectedWord.word, selectedWord.category)}
+                    src={getWordImage(selectedWord.word, selectedWord.category)}
                     alt={`Sign for ${selectedWord.word}`}
                     className="dictionary-alphabet-detail-image"
                   />

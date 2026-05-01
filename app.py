@@ -39,6 +39,7 @@ LETTER_LABELS = [
     "del", "space", "nothing",
 ]
 WORD_PRIORITY = {"hello", "thanks", "yes", "no"}
+HEURISTIC_NUMBER_LABELS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 LETTER_CONF_THRESHOLD = 0.54
 LETTER_K_CONF_THRESHOLD = 0.48
 LETTER_MIN_MARGIN = 0.06
@@ -603,6 +604,15 @@ def load_action_labels():
     return np.array(DEFAULT_LABELS)
 
 
+def get_supported_actions():
+    """Full supported outputs (model labels + heuristic number labels)."""
+    merged = [str(x) for x in actions.tolist()]
+    for label in HEURISTIC_NUMBER_LABELS:
+        if label not in merged:
+            merged.append(label)
+    return merged
+
+
 actions = load_action_labels()
 
 if os.path.exists("model_metadata.json"):
@@ -654,7 +664,8 @@ try:
 
     print(" * Model ready. Server is running at http://127.0.0.1:5000/")
     print(f" * Model expects input shape: (None, {SEQ_LEN}, {FEATURE_DIM})")
-    print(f" * Actions ({len(actions)}): {actions}")
+    print(f" * Model actions ({len(actions)}): {actions}")
+    print(f" * Supported outputs ({len(get_supported_actions())}): {get_supported_actions()}")
 
     # Load pretrained letter model (optional but recommended).
     try:
@@ -937,17 +948,19 @@ def predict():
 
 @app.route("/health", methods=["GET"])
 def health():
+    supported_actions = get_supported_actions()
     return jsonify(
         {
             "status": "ok",
             "model_loaded": model is not None,
             "letter_model_loaded": letter_model is not None,
             "actions": actions.tolist(),
-            "extra_actions": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+            "extra_actions": HEURISTIC_NUMBER_LABELS,
+            "supported_actions": supported_actions,
             "categories": {
                 "letters": [x for x in LETTER_LABELS if len(x) == 1 and x.isalpha()],
                 "greetings_daily": sorted([x for x in actions.tolist() if x in WORD_PRIORITY]),
-                "numbers": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+                "numbers": HEURISTIC_NUMBER_LABELS,
             },
             "seq_len": SEQ_LEN,
             "feature_dim": FEATURE_DIM,

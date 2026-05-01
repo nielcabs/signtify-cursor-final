@@ -3,16 +3,21 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { saveQuizResult, getUserProfile } from '../auth/firestoreUtils';
 import '../styles/pages/Quiz.css';
+import helloImg from '../../ASL pics/Greetings/Hello-removebg-preview.png';
+import goodbye1 from '../../ASL pics/Greetings/Goodbye1-removebg-preview.png';
+import goodMorningImg from '../../ASL pics/Greetings/Happy Birthday 2.png';
+import howAreYouImg from '../../ASL pics/Greetings/Mama-removebg-preview.png';
+import thankYou1 from '../../ASL pics/Greetings/TY_1-removebg-preview.png';
 
 function MiniQuizGreetings() {
   const { currentUser } = useAuth();
   const quizId = 'greetings';
   const questions = [
-    { question: 'What greeting is this sign?', answer: 'Hello', options: ['Hello', 'Goodbye', 'Thank You', 'Please'] },
-    { question: 'What greeting is this sign?', answer: 'Thank You', options: ['Sorry', 'Thank You', 'Welcome', 'Excuse me'] },
-    { question: 'What greeting is this sign?', answer: 'Good Morning', options: ['Good Morning', 'Good Night', 'Good afternoon', 'Goodbye'] },
-    { question: 'What greeting is this sign?', answer: 'How are you?', options: ['How are you?', 'Nice to meet you', 'See you later', 'Take care'] },
-    { question: 'What greeting is this sign?', answer: 'Goodbye', options: ['Hello', 'Goodbye', 'See you later', 'Take care'] },
+    { question: 'What greeting is this sign?', answer: 'Hello', imageUrl: helloImg, options: ['Hello', 'Goodbye', 'Thank You', 'Please'] },
+    { question: 'What greeting is this sign?', answer: 'Thank You', imageUrl: thankYou1, options: ['Sorry', 'Thank You', 'Welcome', 'Excuse me'] },
+    { question: 'What greeting is this sign?', answer: 'Good Morning', imageUrl: goodMorningImg, options: ['Good Morning', 'Good Night', 'Good afternoon', 'Goodbye'] },
+    { question: 'What greeting is this sign?', answer: 'How are you?', imageUrl: howAreYouImg, options: ['How are you?', 'Nice to meet you', 'See you later', 'Take care'] },
+    { question: 'What greeting is this sign?', answer: 'Goodbye', imageUrl: goodbye1, options: ['Hello', 'Goodbye', 'See you later', 'Take care'] },
   ];
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -169,10 +174,20 @@ function MiniQuizGreetings() {
       <div className="quiz-content card">
         <div className="question-display">
           <div className="sign-visual">
-            <div className="sign-placeholder">
-              👋
-              <p>Sign displayed here</p>
-            </div>
+            {questions[currentQuestion].imageUrl ? (
+              <div className="sign-image">
+                <img
+                  src={questions[currentQuestion].imageUrl}
+                  alt="Sign demonstration"
+                  style={{ maxWidth: '100%', borderRadius: '12px' }}
+                />
+              </div>
+            ) : (
+              <div className="sign-placeholder">
+                👋
+                <p>Sign displayed here</p>
+              </div>
+            )}
           </div>
           <h2>{questions[currentQuestion].question}</h2>
         </div>

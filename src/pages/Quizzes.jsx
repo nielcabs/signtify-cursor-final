@@ -5,6 +5,9 @@ import { db } from '../auth/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { getAllLessons } from '../auth/adminUtils';
 import { getUserProfile } from '../auth/firestoreUtils';
+import helloImg from '../../ASL pics/Greetings/Hello-removebg-preview.png';
+import noImg from '../../ASL pics/Daily Conversations/No_1.png';
+import yesImg from '../../ASL pics/Daily Conversations/Yes.png';
 import '../styles/pages/ProficiencyExams.css';
 
 function Quizzes() {
@@ -17,6 +20,14 @@ function Quizzes() {
   const [orderedCategories, setOrderedCategories] = useState([]);
   const [categoryLessons, setCategoryLessons] = useState({});
   const [completedLessons, setCompletedLessons] = useState([]);
+
+  const getCategoryThumbnail = (category) => {
+    if (category === 'alphabet') return '/images/Alphabet_thumbail2.png';
+    if (category === 'greetings') return helloImg;
+    if (category === 'numbers') return noImg;
+    if (category === 'daily-conversation') return yesImg;
+    return null;
+  };
 
   useEffect(() => {
     loadQuizzes();
@@ -246,6 +257,21 @@ function Quizzes() {
                       height: 'auto',
                       maxHeight: '200px',
                       objectFit: 'contain', 
+                      borderRadius: '8px',
+                      display: 'block',
+                      margin: '0 auto'
+                    }}
+                  />
+                ) : getCategoryThumbnail(quiz.category) ? (
+                  <img
+                    src={getCategoryThumbnail(quiz.category)}
+                    alt={`${quiz.category || 'quiz'} thumbnail`}
+                    style={{
+                      width: '100%',
+                      maxWidth: '300px',
+                      height: 'auto',
+                      maxHeight: '200px',
+                      objectFit: 'contain',
                       borderRadius: '8px',
                       display: 'block',
                       margin: '0 auto'

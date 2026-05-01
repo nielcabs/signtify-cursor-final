@@ -50,7 +50,10 @@ const GREETINGS_QUESTIONS = [
   answer: sign,
   options,
   handIcon: '👋',
-  ...(sign === 'Thank You' ? { imageUrl: '/images/TY_1.png' } : {}),
+  ...(sign === 'Hello' ? { imageUrl: 'asset:greeting_hello' } : {}),
+  ...(sign === 'Goodbye' ? { imageUrl: 'asset:greeting_goodbye_1' } : {}),
+  ...(sign === 'Thank You' ? { imageUrl: 'asset:greeting_thank_you_1' } : {}),
+  ...(sign === 'Happy Birthday' ? { imageUrl: 'asset:greeting_happy_birthday_1' } : {}),
 }));
 
 const NUMBERS_QUESTIONS = [
@@ -86,6 +89,9 @@ const DAILY_CONVERSATION_QUESTIONS = [
   answer: sign,
   options,
   handIcon: '💬',
+  ...(sign === 'Yes' ? { imageUrl: 'asset:daily_yes' } : {}),
+  ...(sign === 'No' ? { imageUrl: 'asset:daily_no_1' } : {}),
+  ...(sign === 'Help' ? { imageUrl: 'asset:daily_help' } : {}),
 }));
 
 const DEFAULT_EXAMS = [

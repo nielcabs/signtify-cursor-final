@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { saveExamResult, getUserProfile } from '../auth/firestoreUtils';
+import { resolveSignImageUrl } from '../assets/signImageMap';
 import { useToast } from '../components/ui/Toast';
 import '../styles/pages/Quiz.css';
 
@@ -327,9 +328,9 @@ function Exam() {
                       </span>
                       <span className="exam-review-prompt">{q.question}</span>
                     </div>
-                    {q.imageUrl && (
+                    {resolveSignImageUrl(q.imageUrl) && (
                       <div className="exam-review-image">
-                        <img src={q.imageUrl} alt="Sign" />
+                        <img src={resolveSignImageUrl(q.imageUrl)} alt="Sign" />
                       </div>
                     )}
                     <div className="exam-review-answers">
@@ -404,10 +405,10 @@ function Exam() {
       <div className="quiz-content card">
         <div className="question-display">
           <div className="sign-visual">
-            {question.imageUrl ? (
+            {resolveSignImageUrl(question.imageUrl) ? (
               <div className="sign-image">
                 <img
-                  src={question.imageUrl}
+                  src={resolveSignImageUrl(question.imageUrl)}
                   alt="Sign demonstration"
                   style={{ maxWidth: '100%', borderRadius: '12px' }}
                 />

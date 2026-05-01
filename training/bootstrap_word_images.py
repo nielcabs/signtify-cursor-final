@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+#eee
 def main() -> None:
     pairs = [
         (ROOT / "ASL pics" / "Greetings" / "Hello-removebg-preview.png", "hello"),
