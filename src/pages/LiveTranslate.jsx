@@ -262,12 +262,18 @@ function LiveTranslate() {
     const hand = handInput;
     if (!hand || hand.length < 21) return null;
 
+    const dist2D = (a, b) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0));
     const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
     const indexUp = isUp(8, 6, 0.02);
     const middleUp = isUp(12, 10, 0.02);
     const ringUp = isUp(16, 14, 0.02);
     const pinkyUp = isUp(20, 18, 0.02);
     const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
+    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
+    const indexMiddleDist = dist2D(hand[8], hand[12]);
+    const middleRingDist = dist2D(hand[12], hand[16]);
+    const ringPinkyDist = dist2D(hand[16], hand[20]);
+    const thumbIndexDist = dist2D(hand[4], hand[8]);
 
     // A: mostly closed fist with thumb open.
     if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) {
@@ -279,9 +285,56 @@ function LiveTranslate() {
       return { sign: 'b', confidence: 0.64 };
     }
 
+    // C: all fingers curved/open arc (tips spread but not strongly "up").
+    if (
+      !indexUp && !middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist > (palmWidth * 0.45) &&
+      indexMiddleDist > (palmWidth * 0.16)
+    ) {
+      return { sign: 'c', confidence: 0.58 };
+    }
+
+    // I: pinky only.
+    if (!thumbOpen && !indexUp && !middleUp && !ringUp && pinkyUp) {
+      return { sign: 'i', confidence: 0.62 };
+    }
+
     // L: thumb + index up only.
     if (thumbOpen && indexUp && !middleUp && !ringUp && !pinkyUp) {
       return { sign: 'l', confidence: 0.66 };
+    }
+
+    // U: index + middle up and close together.
+    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist < (palmWidth * 0.26)) {
+      return { sign: 'u', confidence: 0.63 };
+    }
+
+    // V: index + middle up and separated.
+    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist >= (palmWidth * 0.26)) {
+      return { sign: 'v', confidence: 0.63 };
+    }
+
+    // W: index + middle + ring up.
+    if (!thumbOpen && indexUp && middleUp && ringUp && !pinkyUp) {
+      return { sign: 'w', confidence: 0.64 };
+    }
+
+    // X: index up only with curled tip tendency (approx by short tip-to-pip span).
+    if (!thumbOpen && indexUp && !middleUp && !ringUp && !pinkyUp && dist2D(hand[8], hand[7]) < (palmWidth * 0.10)) {
+      return { sign: 'x', confidence: 0.56 };
+    }
+
+    // O: fingers mostly down and thumb touching/near index.
+    if (!indexUp && !middleUp && !ringUp && !pinkyUp && thumbIndexDist < (palmWidth * 0.18)) {
+      return { sign: 'o', confidence: 0.57 };
+    }
+
+    // P/Q rough support (pointing down forms): index/middle down-like with thumb open.
+    if (thumbOpen && !ringUp && !pinkyUp && !indexUp && middleUp) {
+      return { sign: 'p', confidence: 0.52 };
+    }
+    if (thumbOpen && !ringUp && !pinkyUp && !middleUp && indexUp) {
+      return { sign: 'q', confidence: 0.52 };
     }
 
     // Y: thumb + pinky up only.
