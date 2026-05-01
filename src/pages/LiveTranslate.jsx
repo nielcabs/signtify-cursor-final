@@ -67,18 +67,25 @@ function LiveTranslate() {
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
   const isLetter = (value) => /^[a-z]$/i.test(String(value || ''));
   const isNumber = (value) => /^(?:[0-9]|10)$/.test(String(value || ''));
+  // Matches lesson assets: Greetings + Daily conversation words.
   const WORD_SIGNS = new Set([
     'hello',
-    'thanks',
+    'goodbye',
     'thank you',
+    'happy birthday',
+    'mama',
     'yes',
     'no',
-    'goodbye',
     'help',
-    'stop',
-    'please',
   ]);
   const isWord = (value) => WORD_SIGNS.has(String(value || '').toLowerCase());
+
+  /** Map Flask / model labels to lesson vocabulary for Words mode. */
+  const normalizeWordLabel = (raw) => {
+    const k = String(raw || '').toLowerCase().trim();
+    if (k === 'thanks' || k === 'thank_you' || k === 'ty') return 'thank you';
+    return k;
+  };
 
   const isAllowedForMode = (value, mode) => {
     if (mode === 'letters') return isLetter(value);
@@ -550,6 +557,22 @@ function LiveTranslate() {
     const noShape = indexUp && middleUp && !ringUp && !pinkyUp &&
       thumbIndexDist < (palmWidth * 0.34) && thumbMiddleDist < (palmWidth * 0.36);
 
+    const handEnergy = (frame63) => {
+      let s = 0;
+      for (let i = 0; i < 63; i += 1) s += Math.abs(frame63[i] || 0);
+      return s;
+    };
+
+    const lastFrame = sequenceRef.current.length
+      ? sequenceRef.current[sequenceRef.current.length - 1]
+      : null;
+    let twoHandsActive = false;
+    if (lastFrame && lastFrame.length >= 126) {
+      const le = handEnergy(lastFrame.slice(0, 63));
+      const re = handEnergy(lastFrame.slice(63, 126));
+      twoHandsActive = le > 2.2 && re > 2.2;
+    }
+
     // Simple motion proxy from recent sequence: wrist movement.
     const recent = sequenceRef.current.slice(-8);
     let motionX = 0;
@@ -571,18 +594,33 @@ function LiveTranslate() {
       motionY /= (wristYs.length - 1);
     }
 
+    const motionSum = motionX + motionY;
+    const wristY = hand[0][1];
+
     if (noShape) return { sign: 'no', confidence: 0.70 };
 
-    // Thumbs-up/fist family
+    // Thumbs-up / fist family (Help, Yes)
     if (fistLike && thumbOpen && motionY > 0.02) return { sign: 'help', confidence: 0.67 };
     if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.68 };
 
-    // Open-palm family
+    // Happy Birthday: both hands visible + lively motion (celebration proxy).
+    if (twoHandsActive && allOpen && motionSum > 0.045) {
+      return { sign: 'happy birthday', confidence: 0.64 };
+    }
+
+    // Mama: open hand held higher (chin-area tap proxy), relatively still.
+    if (allOpen && wristY < 0.40 && motionSum < 0.022) {
+      return { sign: 'mama', confidence: 0.60 };
+    }
+
+    // Open-palm social signs
     if (allOpen && motionX > 0.035) return { sign: 'goodbye', confidence: 0.68 };
-    if (allOpen && motionX > 0.02) return { sign: 'hello', confidence: 0.66 };
-    if (allOpen && motionY > 0.02) return { sign: 'please', confidence: 0.62 };
-    if (allOpen && !thumbOpen) return { sign: 'stop', confidence: 0.64 };
-    if (allOpen) return { sign: 'thanks', confidence: 0.62 };
+    if (allOpen && motionX > 0.02 && motionX >= motionY * 0.85) return { sign: 'hello', confidence: 0.66 };
+    // Thank you: small vertical / forward motion, not a big side wave.
+    if (allOpen && motionY > 0.012 && motionX < 0.028 && motionSum < 0.04) {
+      return { sign: 'thank you', confidence: 0.62 };
+    }
+    if (allOpen) return { sign: 'thank you', confidence: 0.58 };
     return null;
   };
 
@@ -782,7 +820,7 @@ function LiveTranslate() {
       // Filter out "nothing" if confidence is low
       const predictedSign = data.prediction;
       const conf = data.confidence;
-      let finalSign = predictedSign;
+      let finalSign = mode === 'words' ? normalizeWordLabel(predictedSign) : predictedSign;
       let finalConfidence = conf;
       let usedFingerposeFallback = false;
       const fingerposePrediction = getFingerposePrediction();
@@ -797,6 +835,9 @@ function LiveTranslate() {
       const nothingMinConf = mode === 'letters' ? 0.48 : 0.70;
       if (finalSign === 'nothing' && finalConfidence < nothingMinConf) {
         if (mode === 'numbers' && tryLocalNumberFallback()) {
+          return;
+        }
+        if (mode === 'words' && tryLocalWordFallback()) {
           return;
         }
         setDetectionStatus('Show gesture clearly — add light if score stays low');
