@@ -54,8 +54,8 @@ function LiveTranslate() {
   const LETTER_VOTE_WINDOW = 8;
   const LETTER_MIN_VOTES = 1;
   const LETTER_VOTE_MAX_AGE_MS = 1400;
-  // Keep fingerpose-first for letters, but allow backend fallback by default when local match is uncertain.
-  const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'true') === 'true';
+  // Default to local-first letter detection; backend fallback can be re-enabled via env.
+  const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'false') === 'true';
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
   const isLetter = (value) => /^[a-z]$/i.test(String(value || ''));
   const isNumber = (value) => /^(?:[0-9]|10)$/.test(String(value || ''));
@@ -258,6 +258,47 @@ function LiveTranslate() {
     return { sign, confidence: Math.min(confidence, 0.82) };
   };
 
+  const getLocalLetterHeuristic = (handInput = fingerposeHandRef.current) => {
+    const hand = handInput;
+    if (!hand || hand.length < 21) return null;
+
+    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
+    const indexUp = isUp(8, 6, 0.02);
+    const middleUp = isUp(12, 10, 0.02);
+    const ringUp = isUp(16, 14, 0.02);
+    const pinkyUp = isUp(20, 18, 0.02);
+    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
+
+    // A: mostly closed fist with thumb open.
+    if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) {
+      return { sign: 'a', confidence: 0.62 };
+    }
+
+    // B: four fingers up, thumb folded-ish.
+    if (!thumbOpen && indexUp && middleUp && ringUp && pinkyUp) {
+      return { sign: 'b', confidence: 0.64 };
+    }
+
+    // L: thumb + index up only.
+    if (thumbOpen && indexUp && !middleUp && !ringUp && !pinkyUp) {
+      return { sign: 'l', confidence: 0.66 };
+    }
+
+    // Y: thumb + pinky up only.
+    if (thumbOpen && !indexUp && !middleUp && !ringUp && pinkyUp) {
+      return { sign: 'y', confidence: 0.64 };
+    }
+
+    return null;
+  };
+
+  const tryLocalLetterFallback = (statusLabel = 'Detected (local letter)') => {
+    const localLetter = getLocalLetterHeuristic();
+    if (!localLetter) return false;
+    applyPrediction(localLetter.sign, localLetter.confidence, statusLabel);
+    return true;
+  };
+
   const tryLocalNumberFallback = (statusLabel = 'Detected (local fallback)') => {
     const localNumber = getLocalNumberPrediction();
     if (!localNumber) return false;
@@ -323,6 +364,9 @@ function LiveTranslate() {
     }
 
     if (mode === 'letters') {
+      if (tryLocalLetterFallback()) {
+        return;
+      }
       const fingerposePrediction = getFingerposePrediction();
       if (fingerposePrediction) {
         let effectiveConfidence = fingerposePrediction.confidence;
@@ -359,11 +403,15 @@ function LiveTranslate() {
 
       // Fingerpose uncertain: fall back to backend letter model if sequence is ready.
       if (currentSequence.length !== sequenceLength) {
-        setDetectionStatus(`Collecting frames: ${currentSequence.length}/${sequenceLength}`);
+        if (!tryLocalLetterFallback('Stabilizing local letter...')) {
+          setDetectionStatus(`Collecting frames: ${currentSequence.length}/${sequenceLength}`);
+        }
         return;
       }
       if (!LETTER_BACKEND_FALLBACK_ENABLED) {
-        setDetectionStatus('Stabilizing letter shape...');
+        if (!tryLocalLetterFallback('Stabilizing local letter...')) {
+          setDetectionStatus('Stabilizing letter shape...');
+        }
         return;
       }
       setDetectionStatus('Analyzing letter model...');
@@ -437,6 +485,9 @@ function LiveTranslate() {
 
       // Extra frontend safety: never show out-of-mode labels.
       if (!isAllowedForMode(finalSign, selectedModeRef.current)) {
+        if (mode === 'letters' && tryLocalLetterFallback()) {
+          return;
+        }
         if (mode === 'numbers' && tryLocalNumberFallback()) {
           return;
         }
@@ -463,6 +514,12 @@ function LiveTranslate() {
       } else if (selectedModeRef.current === 'numbers') {
         if (!tryLocalNumberFallback()) {
           setDetectionStatus('⚠️ Backend unreachable — check VITE_FLASK_PREDICT_URL');
+          setDetectedSign(null);
+          setConfidence(0);
+        }
+      } else if (selectedModeRef.current === 'letters') {
+        if (!tryLocalLetterFallback()) {
+          setDetectionStatus(isAbort ? 'Backend slow, retrying...' : 'Stabilizing local letter...');
           setDetectedSign(null);
           setConfidence(0);
         }
