@@ -36,7 +36,7 @@ function LiveTranslate() {
   const FLASK_SERVER_URL = (import.meta.env.VITE_FLASK_PREDICT_URL || 'http://127.0.0.1:5000/predict').trim();
   const CONFIDENCE_THRESHOLD_BY_MODE = {
     // Letters: allow slightly lower scores when lighting is poor (fingerpose + model fusion).
-    letters: 0.28,
+    letters: 0.2,
     numbers: 0.5,
     words: 0.5
   };
@@ -54,8 +54,8 @@ function LiveTranslate() {
   const LETTER_VOTE_WINDOW = 8;
   const LETTER_MIN_VOTES = 1;
   const LETTER_VOTE_MAX_AGE_MS = 1400;
-  // Default to local fingerpose-first for letters in production to avoid backend timeout noise.
-  const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'false') === 'true';
+  // Keep fingerpose-first for letters, but allow backend fallback by default when local match is uncertain.
+  const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'true') === 'true';
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
   const isLetter = (value) => /^[a-z]$/i.test(String(value || ''));
   const isNumber = (value) => /^(?:[0-9]|10)$/.test(String(value || ''));
