@@ -242,20 +242,51 @@ function LiveTranslate() {
     const hand = handInput;
     if (!hand || hand.length < 21) return null;
 
-    // Simple local fallback: estimate 1-5 from raised fingers.
+    const dist2D = (a, b) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0));
     const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
     const indexUp = isUp(8, 6, 0.02);
     const middleUp = isUp(12, 10, 0.02);
     const ringUp = isUp(16, 14, 0.02);
     const pinkyUp = isUp(20, 18, 0.02);
     const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
+    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
 
+    const thumbTouches = (tipIdx, ratio = 0.40) => dist2D(hand[4], hand[tipIdx]) <= (palmWidth * ratio);
+    const thumbTouchIndex = thumbTouches(8, 0.36);
+    const thumbTouchMiddle = thumbTouches(12, 0.38);
+    const thumbTouchRing = thumbTouches(16, 0.40);
+    const thumbTouchPinky = thumbTouches(20, 0.42);
+
+    // 6-9 (ASL style): thumb touching specific fingertip.
+    if (indexUp && middleUp && ringUp && thumbTouchPinky) return { sign: '6', confidence: 0.84 };
+    if (indexUp && middleUp && pinkyUp && thumbTouchRing) return { sign: '7', confidence: 0.84 };
+    if (indexUp && ringUp && pinkyUp && thumbTouchMiddle) return { sign: '8', confidence: 0.84 };
+    if (middleUp && ringUp && pinkyUp && thumbTouchIndex) return { sign: '9', confidence: 0.84 };
+
+    // 10: thumb up, other fingers down.
+    if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) {
+      return { sign: '10', confidence: 0.80 };
+    }
+
+    // 0: all fingers folded/touching into an "O" shape.
+    if (!indexUp && !middleUp && !ringUp && !pinkyUp && thumbTouchIndex && thumbTouchMiddle) {
+      return { sign: '0', confidence: 0.72 };
+    }
+
+    // 1-5 fallback by raised-count.
     const raised = [thumbOpen, indexUp, middleUp, ringUp, pinkyUp].filter(Boolean).length;
     if (raised < 1) return null;
 
+    // Prefer canonical 1-4 without thumb (more stable for users).
+    if (indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: '1', confidence: 0.78 };
+    if (indexUp && middleUp && !ringUp && !pinkyUp) return { sign: '2', confidence: 0.80 };
+    if (indexUp && middleUp && ringUp && !pinkyUp) return { sign: '3', confidence: 0.80 };
+    if (indexUp && middleUp && ringUp && pinkyUp) return { sign: '4', confidence: 0.80 };
+    if (thumbOpen && indexUp && middleUp && ringUp && pinkyUp) return { sign: '5', confidence: 0.82 };
+
     const sign = String(Math.min(raised, 5));
     const confidence = 0.58 + (Math.min(raised, 5) * 0.05);
-    return { sign, confidence: Math.min(confidence, 0.82) };
+    return { sign, confidence: Math.min(confidence, 0.80) };
   };
 
   const getLocalLetterHeuristic = (handInput = fingerposeHandRef.current) => {
