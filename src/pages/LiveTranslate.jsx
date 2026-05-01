@@ -26,6 +26,7 @@ function LiveTranslate() {
   const fingerposeHandRef = useRef(null);
   const fingerposeHandsRef = useRef([]);
   const letterVoteQueueRef = useRef([]);
+  const localLetterVoteQueueRef = useRef([]);
   const frameSendInFlightRef = useRef(false);
   const webglFailureCountRef = useRef(0);
   const webglDisabledRef = useRef(false);
@@ -41,7 +42,7 @@ function LiveTranslate() {
     words: 0.5
   };
   const STABILITY_FRAMES_BY_MODE = {
-    letters: 1,
+    letters: 2,
     numbers: 3,
     words: 3
   };
@@ -52,8 +53,11 @@ function LiveTranslate() {
   const LETTER_ONLY_INTERVAL_MS = 180;
   const DEFAULT_INTERVAL_MS = 500;
   const LETTER_VOTE_WINDOW = 8;
-  const LETTER_MIN_VOTES = 1;
+  const LETTER_MIN_VOTES = 2;
   const LETTER_VOTE_MAX_AGE_MS = 1400;
+  const LOCAL_LETTER_VOTE_WINDOW = 6;
+  const LOCAL_LETTER_MIN_VOTES = 2;
+  const LOCAL_LETTER_VOTE_MAX_AGE_MS = 1300;
   // Default to local-first letter detection; backend fallback can be re-enabled via env.
   const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'false') === 'true';
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
@@ -248,7 +252,9 @@ function LiveTranslate() {
     const middleUp = isUp(12, 10, 0.02);
     const ringUp = isUp(16, 14, 0.02);
     const pinkyUp = isUp(20, 18, 0.02);
-    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
+    const thumbSpread = Math.abs(hand[4][0] - hand[2][0]);
+    const thumbRaised = hand[4][1] < (hand[3][1] - 0.015);
+    const thumbOpen = thumbSpread > 0.08 || thumbRaised;
     const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
 
     const thumbTouches = (tipIdx, ratio = 0.40) => dist2D(hand[4], hand[tipIdx]) <= (palmWidth * ratio);
@@ -264,7 +270,7 @@ function LiveTranslate() {
     if (middleUp && ringUp && pinkyUp && thumbTouchIndex) return { sign: '9', confidence: 0.84 };
 
     // 10: thumb up, other fingers down.
-    if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) {
+    if (thumbRaised && !indexUp && !middleUp && !ringUp && !pinkyUp) {
       return { sign: '10', confidence: 0.80 };
     }
 
@@ -282,7 +288,9 @@ function LiveTranslate() {
     if (indexUp && middleUp && !ringUp && !pinkyUp) return { sign: '2', confidence: 0.80 };
     if (indexUp && middleUp && ringUp && !pinkyUp) return { sign: '3', confidence: 0.80 };
     if (indexUp && middleUp && ringUp && pinkyUp) return { sign: '4', confidence: 0.80 };
-    if (thumbOpen && indexUp && middleUp && ringUp && pinkyUp) return { sign: '5', confidence: 0.82 };
+    if (indexUp && middleUp && ringUp && pinkyUp && (thumbOpen || thumbSpread > 0.06)) {
+      return { sign: '5', confidence: 0.84 };
+    }
 
     const sign = String(Math.min(raised, 5));
     const confidence = 0.58 + (Math.min(raised, 5) * 0.05);
@@ -476,7 +484,30 @@ function LiveTranslate() {
   const tryLocalLetterFallback = (statusLabel = 'Detected (local letter)') => {
     const localLetter = getLocalLetterHeuristic();
     if (!localLetter) return false;
-    applyPrediction(localLetter.sign, localLetter.confidence, statusLabel);
+    const now = Date.now();
+    const queue = [...localLetterVoteQueueRef.current, { ...localLetter, at: now }]
+      .filter(item => now - item.at <= LOCAL_LETTER_VOTE_MAX_AGE_MS)
+      .slice(-LOCAL_LETTER_VOTE_WINDOW);
+    localLetterVoteQueueRef.current = queue;
+
+    const grouped = queue.reduce((acc, item) => {
+      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+      acc[item.sign].count += 1;
+      acc[item.sign].confSum += item.confidence;
+      return acc;
+    }, {});
+
+    const ranked = Object.entries(grouped)
+      .map(([sign, stats]) => ({ sign, count: stats.count, avgConfidence: stats.confSum / stats.count }))
+      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+
+    const best = ranked[0];
+    if (!best || best.count < LOCAL_LETTER_MIN_VOTES) {
+      setDetectionStatus(`Stabilizing local letter... (${best?.count || 1}/${LOCAL_LETTER_MIN_VOTES})`);
+      return false;
+    }
+
+    applyPrediction(best.sign, Math.max(localLetter.confidence, best.avgConfidence), statusLabel);
     return true;
   };
 
@@ -909,6 +940,7 @@ function LiveTranslate() {
     fingerposeHandRef.current = null;
     fingerposeHandsRef.current = [];
     letterVoteQueueRef.current = [];
+    localLetterVoteQueueRef.current = [];
     frameSendInFlightRef.current = false;
     webglFailureCountRef.current = 0;
     webglDisabledRef.current = false;
@@ -934,6 +966,7 @@ function LiveTranslate() {
     selectedModeRef.current = selectedMode;
     lastPredictionRef.current = { sign: null, count: 0 };
     letterVoteQueueRef.current = [];
+    localLetterVoteQueueRef.current = [];
     setDetectedSign(null);
     setConfidence(0);
     setTranslationHistory([]);
