@@ -27,6 +27,7 @@ function LiveTranslate() {
   const fingerposeHandsRef = useRef([]);
   const letterVoteQueueRef = useRef([]);
   const localLetterVoteQueueRef = useRef([]);
+  const localWordVoteQueueRef = useRef([]);
   const frameSendInFlightRef = useRef(false);
   const webglFailureCountRef = useRef(0);
   const webglDisabledRef = useRef(false);
@@ -58,6 +59,9 @@ function LiveTranslate() {
   const LOCAL_LETTER_VOTE_WINDOW = 6;
   const LOCAL_LETTER_MIN_VOTES = 2;
   const LOCAL_LETTER_VOTE_MAX_AGE_MS = 1300;
+  const LOCAL_WORD_VOTE_WINDOW = 6;
+  const LOCAL_WORD_MIN_VOTES = 2;
+  const LOCAL_WORD_VOTE_MAX_AGE_MS = 1600;
   // Default to local-first letter detection; backend fallback can be re-enabled via env.
   const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'false') === 'true';
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
@@ -258,6 +262,7 @@ function LiveTranslate() {
     const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
 
     const thumbTouches = (tipIdx, ratio = 0.40) => dist2D(hand[4], hand[tipIdx]) <= (palmWidth * ratio);
+    const thumbIndexDist = dist2D(hand[4], hand[8]);
     const thumbTouchIndex = thumbTouches(8, 0.36);
     const thumbTouchMiddle = thumbTouches(12, 0.38);
     const thumbTouchRing = thumbTouches(16, 0.40);
@@ -287,10 +292,13 @@ function LiveTranslate() {
     if (indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: '1', confidence: 0.78 };
     if (indexUp && middleUp && !ringUp && !pinkyUp) return { sign: '2', confidence: 0.80 };
     if (indexUp && middleUp && ringUp && !pinkyUp) return { sign: '3', confidence: 0.80 };
-    if (indexUp && middleUp && ringUp && pinkyUp) return { sign: '4', confidence: 0.80 };
-    if (indexUp && middleUp && ringUp && pinkyUp && (thumbOpen || thumbSpread > 0.06)) {
+    if (
+      indexUp && middleUp && ringUp && pinkyUp &&
+      (thumbOpen || thumbRaised || thumbSpread > 0.045 || thumbIndexDist > (palmWidth * 0.28))
+    ) {
       return { sign: '5', confidence: 0.84 };
     }
+    if (indexUp && middleUp && ringUp && pinkyUp) return { sign: '4', confidence: 0.80 };
 
     const sign = String(Math.min(raised, 5));
     const confidence = 0.58 + (Math.min(raised, 5) * 0.05);
@@ -511,6 +519,77 @@ function LiveTranslate() {
     return true;
   };
 
+  const getLocalWordHeuristic = (handInput = fingerposeHandRef.current) => {
+    const hand = handInput;
+    if (!hand || hand.length < 21) return null;
+
+    const dist2D = (a, b) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0));
+    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
+    const indexUp = isUp(8, 6, 0.02);
+    const middleUp = isUp(12, 10, 0.02);
+    const ringUp = isUp(16, 14, 0.02);
+    const pinkyUp = isUp(20, 18, 0.02);
+    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08 || hand[4][1] < (hand[3][1] - 0.015);
+    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
+    const thumbIndexDist = dist2D(hand[4], hand[8]);
+    const thumbMiddleDist = dist2D(hand[4], hand[12]);
+
+    const allOpen = indexUp && middleUp && ringUp && pinkyUp;
+    const fistLike = !indexUp && !middleUp && !ringUp && !pinkyUp;
+    const noShape = indexUp && middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist < (palmWidth * 0.34) && thumbMiddleDist < (palmWidth * 0.36);
+
+    // Simple motion proxy from recent sequence: wrist x movement.
+    const recent = sequenceRef.current.slice(-8);
+    let motionX = 0;
+    if (recent.length >= 2) {
+      const wristXs = recent.map(frame => {
+        const leftEnergy = Math.abs(frame[0]) + Math.abs(frame[1]) + Math.abs(frame[2]);
+        const rightEnergy = Math.abs(frame[63]) + Math.abs(frame[64]) + Math.abs(frame[65]);
+        return leftEnergy >= rightEnergy ? frame[0] : frame[63];
+      });
+      for (let i = 1; i < wristXs.length; i += 1) motionX += Math.abs(wristXs[i] - wristXs[i - 1]);
+      motionX /= (wristXs.length - 1);
+    }
+
+    if (noShape) return { sign: 'no', confidence: 0.70 };
+    if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.68 };
+    if (allOpen && motionX > 0.02) return { sign: 'hello', confidence: 0.66 };
+    if (allOpen) return { sign: 'thanks', confidence: 0.62 };
+    return null;
+  };
+
+  const tryLocalWordFallback = (statusLabel = 'Detected (local word)') => {
+    const localWord = getLocalWordHeuristic();
+    if (!localWord) return false;
+
+    const now = Date.now();
+    const queue = [...localWordVoteQueueRef.current, { ...localWord, at: now }]
+      .filter(item => now - item.at <= LOCAL_WORD_VOTE_MAX_AGE_MS)
+      .slice(-LOCAL_WORD_VOTE_WINDOW);
+    localWordVoteQueueRef.current = queue;
+
+    const grouped = queue.reduce((acc, item) => {
+      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+      acc[item.sign].count += 1;
+      acc[item.sign].confSum += item.confidence;
+      return acc;
+    }, {});
+
+    const ranked = Object.entries(grouped)
+      .map(([sign, stats]) => ({ sign, count: stats.count, avgConfidence: stats.confSum / stats.count }))
+      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+
+    const best = ranked[0];
+    if (!best || best.count < LOCAL_WORD_MIN_VOTES) {
+      setDetectionStatus(`Stabilizing local word... (${best?.count || 1}/${LOCAL_WORD_MIN_VOTES})`);
+      return false;
+    }
+
+    applyPrediction(best.sign, Math.max(localWord.confidence, best.avgConfidence), statusLabel);
+    return true;
+  };
+
   const tryLocalNumberFallback = (statusLabel = 'Detected (local fallback)') => {
     const localNumber = getLocalNumberPrediction();
     if (!localNumber) return false;
@@ -627,6 +706,10 @@ function LiveTranslate() {
         return;
       }
       setDetectionStatus('Analyzing letter model...');
+    } else if (mode === 'words') {
+      if (tryLocalWordFallback()) {
+        return;
+      }
     } else {
       // Don't predict if already processing
       if (isProcessingRef.current) {
@@ -700,6 +783,9 @@ function LiveTranslate() {
         if (mode === 'letters' && tryLocalLetterFallback()) {
           return;
         }
+        if (mode === 'words' && tryLocalWordFallback()) {
+          return;
+        }
         if (mode === 'numbers' && tryLocalNumberFallback()) {
           return;
         }
@@ -732,6 +818,12 @@ function LiveTranslate() {
       } else if (selectedModeRef.current === 'letters') {
         if (!tryLocalLetterFallback()) {
           setDetectionStatus(isAbort ? 'Backend slow, retrying...' : 'Stabilizing local letter...');
+          setDetectedSign(null);
+          setConfidence(0);
+        }
+      } else if (selectedModeRef.current === 'words') {
+        if (!tryLocalWordFallback()) {
+          setDetectionStatus(isAbort ? 'Backend slow, retrying...' : 'Stabilizing local word...');
           setDetectedSign(null);
           setConfidence(0);
         }
@@ -941,6 +1033,7 @@ function LiveTranslate() {
     fingerposeHandsRef.current = [];
     letterVoteQueueRef.current = [];
     localLetterVoteQueueRef.current = [];
+    localWordVoteQueueRef.current = [];
     frameSendInFlightRef.current = false;
     webglFailureCountRef.current = 0;
     webglDisabledRef.current = false;
@@ -967,6 +1060,7 @@ function LiveTranslate() {
     lastPredictionRef.current = { sign: null, count: 0 };
     letterVoteQueueRef.current = [];
     localLetterVoteQueueRef.current = [];
+    localWordVoteQueueRef.current = [];
     setDetectedSign(null);
     setConfidence(0);
     setTranslationHistory([]);
