@@ -67,7 +67,18 @@ function LiveTranslate() {
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
   const isLetter = (value) => /^[a-z]$/i.test(String(value || ''));
   const isNumber = (value) => /^(?:[0-9]|10)$/.test(String(value || ''));
-  const isWord = (value) => ['hello', 'thanks', 'yes', 'no'].includes(String(value || '').toLowerCase());
+  const WORD_SIGNS = new Set([
+    'hello',
+    'thanks',
+    'thank you',
+    'yes',
+    'no',
+    'goodbye',
+    'help',
+    'stop',
+    'please',
+  ]);
+  const isWord = (value) => WORD_SIGNS.has(String(value || '').toLowerCase());
 
   const isAllowedForMode = (value, mode) => {
     if (mode === 'letters') return isLetter(value);
@@ -539,22 +550,38 @@ function LiveTranslate() {
     const noShape = indexUp && middleUp && !ringUp && !pinkyUp &&
       thumbIndexDist < (palmWidth * 0.34) && thumbMiddleDist < (palmWidth * 0.36);
 
-    // Simple motion proxy from recent sequence: wrist x movement.
+    // Simple motion proxy from recent sequence: wrist movement.
     const recent = sequenceRef.current.slice(-8);
     let motionX = 0;
+    let motionY = 0;
     if (recent.length >= 2) {
       const wristXs = recent.map(frame => {
         const leftEnergy = Math.abs(frame[0]) + Math.abs(frame[1]) + Math.abs(frame[2]);
         const rightEnergy = Math.abs(frame[63]) + Math.abs(frame[64]) + Math.abs(frame[65]);
         return leftEnergy >= rightEnergy ? frame[0] : frame[63];
       });
+      const wristYs = recent.map(frame => {
+        const leftEnergy = Math.abs(frame[0]) + Math.abs(frame[1]) + Math.abs(frame[2]);
+        const rightEnergy = Math.abs(frame[63]) + Math.abs(frame[64]) + Math.abs(frame[65]);
+        return leftEnergy >= rightEnergy ? frame[1] : frame[64];
+      });
       for (let i = 1; i < wristXs.length; i += 1) motionX += Math.abs(wristXs[i] - wristXs[i - 1]);
+      for (let i = 1; i < wristYs.length; i += 1) motionY += Math.abs(wristYs[i] - wristYs[i - 1]);
       motionX /= (wristXs.length - 1);
+      motionY /= (wristYs.length - 1);
     }
 
     if (noShape) return { sign: 'no', confidence: 0.70 };
+
+    // Thumbs-up/fist family
+    if (fistLike && thumbOpen && motionY > 0.02) return { sign: 'help', confidence: 0.67 };
     if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.68 };
+
+    // Open-palm family
+    if (allOpen && motionX > 0.035) return { sign: 'goodbye', confidence: 0.68 };
     if (allOpen && motionX > 0.02) return { sign: 'hello', confidence: 0.66 };
+    if (allOpen && motionY > 0.02) return { sign: 'please', confidence: 0.62 };
+    if (allOpen && !thumbOpen) return { sign: 'stop', confidence: 0.64 };
     if (allOpen) return { sign: 'thanks', confidence: 0.62 };
     return null;
   };
