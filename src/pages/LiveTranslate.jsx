@@ -48,6 +48,7 @@ function LiveTranslate() {
   const FINGERPOSE_MATCH_SCORE = 4.8;
   const FINGERPOSE_MIN_CONFIDENCE = 0.22;
   const FINGERPOSE_FOLDED_MIN_CONFIDENCE = 0.14;
+  const BACKEND_TIMEOUT_MS = 2500;
   const LETTER_ONLY_INTERVAL_MS = 180;
   const DEFAULT_INTERVAL_MS = 500;
   const LETTER_VOTE_WINDOW = 8;
@@ -235,6 +236,33 @@ function LiveTranslate() {
     };
   };
 
+  const getLocalNumberPrediction = (handInput = fingerposeHandRef.current) => {
+    const hand = handInput;
+    if (!hand || hand.length < 21) return null;
+
+    // Simple local fallback: estimate 1-5 from raised fingers.
+    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
+    const indexUp = isUp(8, 6, 0.02);
+    const middleUp = isUp(12, 10, 0.02);
+    const ringUp = isUp(16, 14, 0.02);
+    const pinkyUp = isUp(20, 18, 0.02);
+    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
+
+    const raised = [thumbOpen, indexUp, middleUp, ringUp, pinkyUp].filter(Boolean).length;
+    if (raised < 1) return null;
+
+    const sign = String(Math.min(raised, 5));
+    const confidence = 0.58 + (Math.min(raised, 5) * 0.05);
+    return { sign, confidence: Math.min(confidence, 0.82) };
+  };
+
+  const tryLocalNumberFallback = (statusLabel = 'Detected (local fallback)') => {
+    const localNumber = getLocalNumberPrediction();
+    if (!localNumber) return false;
+    applyPrediction(localNumber.sign, localNumber.confidence, statusLabel);
+    return true;
+  };
+
   const normalizeHandsResults = (results) => {
     const mapped = {
       leftHandLandmarks: null,
@@ -286,6 +314,11 @@ function LiveTranslate() {
   const predictLoop = async () => {
     const mode = selectedModeRef.current;
     const currentSequence = sequenceRef.current;
+
+    // In production, this keeps numbers usable even when backend confidence is unstable.
+    if (mode === 'numbers' && tryLocalNumberFallback('Detected (local)')) {
+      return;
+    }
 
     if (mode === 'letters') {
       const fingerposePrediction = getFingerposePrediction();
@@ -349,11 +382,15 @@ function LiveTranslate() {
     isProcessingRef.current = true;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
       const response = await fetch(FLASK_SERVER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sequence: currentSequence, mode: selectedModeRef.current }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Server error: ${response.statusText}`);
@@ -383,6 +420,9 @@ function LiveTranslate() {
       // Don't suppress too aggressively; backend already applies quality gates.
       const nothingMinConf = mode === 'letters' ? 0.48 : 0.70;
       if (finalSign === 'nothing' && finalConfidence < nothingMinConf) {
+        if (mode === 'numbers' && tryLocalNumberFallback()) {
+          return;
+        }
         setDetectionStatus('Show gesture clearly — add light if score stays low');
         setDetectedSign(null);
         setConfidence(0);
@@ -391,6 +431,9 @@ function LiveTranslate() {
 
       // Extra frontend safety: never show out-of-mode labels.
       if (!isAllowedForMode(finalSign, selectedModeRef.current)) {
+        if (mode === 'numbers' && tryLocalNumberFallback()) {
+          return;
+        }
         setDetectionStatus(`Filtered non-${selectedModeRef.current} prediction`);
         setDetectedSign(null);
         setConfidence(0);
@@ -408,8 +451,14 @@ function LiveTranslate() {
       const fingerposePrediction = getFingerposePrediction();
       if (fingerposePrediction && fingerposePrediction.confidence >= (FINGERPOSE_MIN_CONFIDENCE * 0.8)) {
         applyPrediction(fingerposePrediction.sign, fingerposePrediction.confidence, 'Detected');
+      } else if (selectedModeRef.current === 'numbers') {
+        if (!tryLocalNumberFallback()) {
+          setDetectionStatus('⚠️ Backend unreachable — check VITE_FLASK_PREDICT_URL');
+          setDetectedSign(null);
+          setConfidence(0);
+        }
       } else {
-        setDetectionStatus('⚠️ Server offline - Start Flask');
+        setDetectionStatus('⚠️ Backend unreachable — check VITE_FLASK_PREDICT_URL');
         setDetectedSign(null);
         setConfidence(0);
       }
@@ -879,7 +928,7 @@ function LiveTranslate() {
               <li>Avoid cluttered backgrounds</li>
               <li>Wait for "Detected" status</li>
               <li>Letter mode accepts roughly <strong>28%+</strong> when shapes stabilize; numbers/words need higher scores</li>
-              <li>If it stays red: turn on a lamp behind the camera (face lighting), not only screen brightness</li>
+              <li>If it stays red: add light in front of you (toward your hand/face), not only screen brightness</li>
             </ul>
           </div>
         </div>

@@ -113,6 +113,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1.5rem;
+  align-items: stretch;
 }
 
 .word-card {
@@ -125,6 +126,10 @@
   border-radius: 20px;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: 230px;
 }
 
 
@@ -145,6 +150,10 @@
   font-size: 3rem;
   margin-bottom: 1rem;
   animation: bounce 2s ease-in-out infinite;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dictionary-alphabet-icon {
@@ -160,6 +169,12 @@
   font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 0.75rem;
+  min-height: 2.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .word-category {
@@ -172,6 +187,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-top: auto;
+  align-self: center;
 }
 
 .no-results {
