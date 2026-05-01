@@ -274,6 +274,10 @@ function LiveTranslate() {
     const middleRingDist = dist2D(hand[12], hand[16]);
     const ringPinkyDist = dist2D(hand[16], hand[20]);
     const thumbIndexDist = dist2D(hand[4], hand[8]);
+    const thumbMiddleDist = dist2D(hand[4], hand[12]);
+    const thumbRingDist = dist2D(hand[4], hand[16]);
+    const thumbPinkyDist = dist2D(hand[4], hand[20]);
+    const indexOnlyUp = indexUp && !middleUp && !ringUp && !pinkyUp;
 
     // A: mostly closed fist with thumb open.
     if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) {
@@ -283,6 +287,38 @@ function LiveTranslate() {
     // B: four fingers up, thumb folded-ish.
     if (!thumbOpen && indexUp && middleUp && ringUp && pinkyUp) {
       return { sign: 'b', confidence: 0.64 };
+    }
+
+    // D: index up, others folded, thumb near middle.
+    if (indexOnlyUp && thumbMiddleDist < (palmWidth * 0.35)) {
+      return { sign: 'd', confidence: 0.60 };
+    }
+
+    // E: all folded with thumb tucked near fingertips.
+    if (
+      !thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist < (palmWidth * 0.28) &&
+      thumbMiddleDist < (palmWidth * 0.32)
+    ) {
+      return { sign: 'e', confidence: 0.58 };
+    }
+
+    // F: thumb touching index, other three up.
+    if (
+      thumbIndexDist < (palmWidth * 0.22) &&
+      middleUp && ringUp && pinkyUp
+    ) {
+      return { sign: 'f', confidence: 0.61 };
+    }
+
+    // G: index only with thumb open and horizontal-ish spread.
+    if (indexOnlyUp && thumbOpen && thumbIndexDist > (palmWidth * 0.42)) {
+      return { sign: 'g', confidence: 0.55 };
+    }
+
+    // H: index+middle up, ring+pinky down, wider spread than U.
+    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist >= (palmWidth * 0.30)) {
+      return { sign: 'h', confidence: 0.57 };
     }
 
     // C: all fingers curved/open arc (tips spread but not strongly "up").
@@ -299,9 +335,41 @@ function LiveTranslate() {
       return { sign: 'i', confidence: 0.62 };
     }
 
+    // J: pinky-up variant; practical fallback to I-shape.
+    if (thumbOpen && !indexUp && !middleUp && !ringUp && pinkyUp) {
+      return { sign: 'j', confidence: 0.53 };
+    }
+
+    // K: thumb between index/middle with both up.
+    if (
+      thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist < (palmWidth * 0.40) && thumbMiddleDist < (palmWidth * 0.40)
+    ) {
+      return { sign: 'k', confidence: 0.58 };
+    }
+
     // L: thumb + index up only.
     if (thumbOpen && indexUp && !middleUp && !ringUp && !pinkyUp) {
       return { sign: 'l', confidence: 0.66 };
+    }
+
+    // M: thumb tucked under three/four fingers (closed fist + very tucked thumb).
+    if (
+      !indexUp && !middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist < (palmWidth * 0.24) &&
+      thumbMiddleDist < (palmWidth * 0.24) &&
+      thumbRingDist < (palmWidth * 0.24)
+    ) {
+      return { sign: 'm', confidence: 0.57 };
+    }
+
+    // N: thumb tucked under first two fingers.
+    if (
+      !indexUp && !middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist < (palmWidth * 0.26) &&
+      thumbMiddleDist < (palmWidth * 0.26)
+    ) {
+      return { sign: 'n', confidence: 0.56 };
     }
 
     // U: index + middle up and close together.
@@ -317,6 +385,30 @@ function LiveTranslate() {
     // W: index + middle + ring up.
     if (!thumbOpen && indexUp && middleUp && ringUp && !pinkyUp) {
       return { sign: 'w', confidence: 0.64 };
+    }
+
+    // R: index+middle crossed approximation (both up and very close).
+    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist < (palmWidth * 0.18)) {
+      return { sign: 'r', confidence: 0.56 };
+    }
+
+    // S: closed fist with thumb crossing in front.
+    if (
+      !indexUp && !middleUp && !ringUp && !pinkyUp &&
+      thumbOpen &&
+      thumbIndexDist < (palmWidth * 0.30)
+    ) {
+      return { sign: 's', confidence: 0.57 };
+    }
+
+    // T: closed fist with thumb near index-middle seam.
+    if (
+      !indexUp && !middleUp && !ringUp && !pinkyUp &&
+      !thumbOpen &&
+      thumbIndexDist < (palmWidth * 0.22) &&
+      thumbMiddleDist < (palmWidth * 0.30)
+    ) {
+      return { sign: 't', confidence: 0.56 };
     }
 
     // X: index up only with curled tip tendency (approx by short tip-to-pip span).
@@ -340,6 +432,11 @@ function LiveTranslate() {
     // Y: thumb + pinky up only.
     if (thumbOpen && !indexUp && !middleUp && !ringUp && pinkyUp) {
       return { sign: 'y', confidence: 0.64 };
+    }
+
+    // Z: use index-only fallback when none of the stronger index-only letters matched.
+    if (indexOnlyUp) {
+      return { sign: 'z', confidence: 0.50 };
     }
 
     return null;
