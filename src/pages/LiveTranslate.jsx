@@ -45,15 +45,17 @@ function LiveTranslate() {
     numbers: 3,
     words: 3
   };
-  const FINGERPOSE_MATCH_SCORE = 4.8;
-  const FINGERPOSE_MIN_CONFIDENCE = 0.22;
-  const FINGERPOSE_FOLDED_MIN_CONFIDENCE = 0.14;
-  const BACKEND_TIMEOUT_MS = 2500;
+  const FINGERPOSE_MATCH_SCORE = 3.8;
+  const FINGERPOSE_MIN_CONFIDENCE = 0.16;
+  const FINGERPOSE_FOLDED_MIN_CONFIDENCE = 0.10;
+  const BACKEND_TIMEOUT_MS = 5000;
   const LETTER_ONLY_INTERVAL_MS = 180;
   const DEFAULT_INTERVAL_MS = 500;
   const LETTER_VOTE_WINDOW = 8;
   const LETTER_MIN_VOTES = 1;
   const LETTER_VOTE_MAX_AGE_MS = 1400;
+  // Default to local fingerpose-first for letters in production to avoid backend timeout noise.
+  const LETTER_BACKEND_FALLBACK_ENABLED = (import.meta.env.VITE_ENABLE_LETTER_BACKEND_FALLBACK ?? 'false') === 'true';
   const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
   const isLetter = (value) => /^[a-z]$/i.test(String(value || ''));
   const isNumber = (value) => /^(?:[0-9]|10)$/.test(String(value || ''));
@@ -360,6 +362,10 @@ function LiveTranslate() {
         setDetectionStatus(`Collecting frames: ${currentSequence.length}/${sequenceLength}`);
         return;
       }
+      if (!LETTER_BACKEND_FALLBACK_ENABLED) {
+        setDetectionStatus('Stabilizing letter shape...');
+        return;
+      }
       setDetectionStatus('Analyzing letter model...');
     } else {
       // Don't predict if already processing
@@ -447,7 +453,10 @@ function LiveTranslate() {
       );
 
     } catch (error) {
-      console.error("Prediction error:", error);
+      const isAbort = error?.name === 'AbortError';
+      if (!isAbort) {
+        console.error("Prediction error:", error);
+      }
       const fingerposePrediction = getFingerposePrediction();
       if (fingerposePrediction && fingerposePrediction.confidence >= (FINGERPOSE_MIN_CONFIDENCE * 0.8)) {
         applyPrediction(fingerposePrediction.sign, fingerposePrediction.confidence, 'Detected');
@@ -458,7 +467,7 @@ function LiveTranslate() {
           setConfidence(0);
         }
       } else {
-        setDetectionStatus('⚠️ Backend unreachable — check VITE_FLASK_PREDICT_URL');
+        setDetectionStatus(isAbort ? 'Backend slow, retrying...' : '⚠️ Backend unreachable — check VITE_FLASK_PREDICT_URL');
         setDetectedSign(null);
         setConfidence(0);
       }
