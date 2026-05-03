@@ -68,7 +68,7 @@ function TeacherDashboard() {
     <div className="admin-management">
       <div className="management-header">
         <h1>👩‍🏫 Teacher Dashboard</h1>
-        <p>Monitor student progress and manage learning content.</p>
+        <p>Monitor students and update lessons, quizzes, exams, and dictionary (teacher role only).</p>
       </div>
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -123,9 +123,10 @@ function TeacherDashboard() {
       </div>
 
       <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <Link to="/admin/lessons" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>📖 Manage Lessons</Link>
-        <Link to="/admin/quizzes" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>📝 Manage Quizzes</Link>
-        <Link to="/admin/exams" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>🏆 Manage Exams</Link>
+        <Link to="/admin/lessons" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>📖 Lessons</Link>
+        <Link to="/admin/quizzes" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>📝 Quizzes</Link>
+        <Link to="/admin/exams" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>🏆 Exams</Link>
+        <Link to="/admin/dictionary" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>📚 Dictionary</Link>
       </div>
     </div>
   );

@@ -2,10 +2,11 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 /**
- * Allows access to teachers. Admins are treated as a super-set of teachers.
+ * Content management (lessons, quizzes, exams, dictionary): teachers only.
+ * Admins handle users only — see AdminRoute + /admin/users.
  */
 const TeacherRoute = ({ children }) => {
-  const { currentUser, isAdmin, isTeacher, loading } = useAuth();
+  const { currentUser, isTeacher, loading } = useAuth();
 
   if (loading) {
     return (
@@ -24,7 +25,7 @@ const TeacherRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isTeacher && !isAdmin) {
+  if (!isTeacher) {
     return <Navigate to="/" replace />;
   }
 

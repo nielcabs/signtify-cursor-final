@@ -318,7 +318,7 @@ function Navbar() {
                     </button>
                   </Link>
                 )}
-                {(isTeacher || isAdmin) && (
+                {isTeacher && (
                   <Link to="/teacher" className="profile-link" onClick={closeMobileMenu}>
                     <button className="profile-button admin-button">
                       👩‍🏫 Teacher Dashboard

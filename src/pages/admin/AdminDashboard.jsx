@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllUsers, getAllLessons, getAllQuizzes, getAllExams, getAllDictionaryEntries } from '../../auth/adminUtils';
+import { getAllUsers } from '../../auth/adminUtils';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { broadcastNotification, NOTIFICATION_TYPES } from '../../notifications/notifications';
@@ -9,13 +9,7 @@ import '../../styles/pages/AdminDashboard.css';
 function AdminDashboard() {
   const { currentUser } = useAuth();
   const toast = useToast();
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalLessons: 0,
-    totalQuizzes: 0,
-    totalExams: 0,
-    totalDictionaryEntries: 0
-  });
+  const [stats, setStats] = useState({ totalUsers: 0 });
   const [loading, setLoading] = useState(true);
   const [activeUserIds, setActiveUserIds] = useState([]);
   const [showAnnounce, setShowAnnounce] = useState(false);
@@ -31,21 +25,8 @@ function AdminDashboard() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const [users, lessons, quizzes, exams, dictionary] = await Promise.all([
-        getAllUsers(),
-        getAllLessons(),
-        getAllQuizzes(),
-        getAllExams(),
-        getAllDictionaryEntries()
-      ]);
-
-      setStats({
-        totalUsers: users.length,
-        totalLessons: lessons.length,
-        totalQuizzes: quizzes.length,
-        totalExams: exams.length,
-        totalDictionaryEntries: dictionary.length
-      });
+      const users = await getAllUsers();
+      setStats({ totalUsers: users.length });
       setActiveUserIds(users.map((u) => u.id));
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -96,7 +77,7 @@ function AdminDashboard() {
     <div className="admin-dashboard">
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
-        <p>Manage your Signtify application</p>
+        <p>User accounts, announcements, and activity — teachers update lessons and exams.</p>
       </div>
 
       <div className="admin-quick-actions">
@@ -110,82 +91,29 @@ function AdminDashboard() {
           <div className="stat-icon">👥</div>
           <div className="stat-info">
             <h3>{stats.totalUsers}</h3>
-            <p>Total Users</p>
-          </div>
-        </div>
-
-        <div className="stat-card card">
-          <div className="stat-icon">📖</div>
-          <div className="stat-info">
-            <h3>{stats.totalLessons}</h3>
-            <p>Lessons</p>
-          </div>
-        </div>
-
-        <div className="stat-card card">
-          <div className="stat-icon">📝</div>
-          <div className="stat-info">
-            <h3>{stats.totalQuizzes}</h3>
-            <p>Quizzes</p>
-          </div>
-        </div>
-
-        <div className="stat-card card">
-          <div className="stat-icon">🎓</div>
-          <div className="stat-info">
-            <h3>{stats.totalExams}</h3>
-            <p>Exams</p>
-          </div>
-        </div>
-
-        <div className="stat-card card">
-          <div className="stat-icon">📚</div>
-          <div className="stat-info">
-            <h3>{stats.totalDictionaryEntries}</h3>
-            <p>Dictionary Entries</p>
+            <p>Active users (non-archived)</p>
           </div>
         </div>
       </div>
 
       <div className="admin-sections">
-        <h2>Management Sections</h2>
+        <h2>Admin tools</h2>
         <div className="sections-grid">
           <Link to="/admin/users" className="section-card card">
             <div className="section-icon">👥</div>
             <h3>User Management</h3>
-            <p>View, edit, and manage user accounts</p>
-          </Link>
-
-          <Link to="/admin/lessons" className="section-card card">
-            <div className="section-icon">📖</div>
-            <h3>Lesson Management</h3>
-            <p>Create, edit, and delete ASL lessons</p>
-          </Link>
-
-          <Link to="/admin/quizzes" className="section-card card">
-            <div className="section-icon">📝</div>
-            <h3>Quiz Management</h3>
-            <p>Create, edit, and delete quizzes</p>
-          </Link>
-
-          <Link to="/admin/exams" className="section-card card">
-            <div className="section-icon">🎓</div>
-            <h3>Exam Management</h3>
-            <p>Create, edit, and delete exams</p>
-          </Link>
-
-          <Link to="/admin/dictionary" className="section-card card">
-            <div className="section-icon">📚</div>
-            <h3>Dictionary Management</h3>
-            <p>Manage sign language dictionary content</p>
+            <p>Roles, archive, and account control</p>
           </Link>
 
           <Link to="/admin/activity-log" className="section-card card">
             <div className="section-icon">📋</div>
             <h3>Activity Log</h3>
-            <p>View all admin and user activities</p>
+            <p>View admin and system actions</p>
           </Link>
         </div>
+        <p style={{ marginTop: '1rem', color: 'var(--color-text-muted, #6b7280)', maxWidth: '42rem' }}>
+          Lessons, quizzes, proficiency exams, and dictionary are maintained in the <strong>Teacher Dashboard</strong> (teacher accounts only).
+        </p>
       </div>
 
       {showAnnounce && (
@@ -193,7 +121,7 @@ function AdminDashboard() {
           <div className="modal-content card" onClick={(e) => e.stopPropagation()}>
             <h2>📣 Send Announcement</h2>
             <p style={{ color: 'var(--color-text-muted, #6b7280)', marginBottom: '1rem' }}>
-              This will appear in every active user's notification center.
+              Each user gets a <strong>pop-up notification</strong> and an entry in their notification bell.
             </p>
             <div className="form-group">
               <label>Title</label>

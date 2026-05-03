@@ -22,6 +22,7 @@ function ProficiencyExams() {
   const { currentUser } = useAuth();
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [hasAnyLessonCompleted, setHasAnyLessonCompleted] = useState(false);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ function ProficiencyExams() {
       if (!document.hidden && currentUser) {
         loadExams();
       }
-    }, 5000);
+    }, 12000);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
@@ -48,6 +49,7 @@ function ProficiencyExams() {
   const loadExams = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       
       // Load all exams
       const examsRef = collection(db, 'exams');
@@ -132,17 +134,10 @@ function ProficiencyExams() {
         };
       });
       
-      // Debug logging (optional - can be removed in production)
-      if (examsData.length > 0) {
-        console.log('📊 Exam Unlock Status:');
-        examsWithStatus.forEach((exam, idx) => {
-          console.log(`  ${idx + 1}. ${exam.title} - Order: ${exam.order}, Unlocked: ${exam.isUnlocked}, Passed: ${exam.isPassed}`);
-        });
-      }
-      
       setExams(examsWithStatus);
     } catch (error) {
       console.error('Error loading exams:', error);
+      setLoadError(error?.message || 'Could not load exams. Check your connection and Firestore rules.');
     } finally {
       setLoading(false);
     }
@@ -162,8 +157,18 @@ function ProficiencyExams() {
     <div className="proficiency-page">
       <div className="proficiency-header">
         <h1>Proficiency Exams</h1>
-        <p>Progressive certification path - pass each exam with 80%+ to unlock the next</p>
+        <p>Progressive path — pass each exam (usually 80%+) to unlock the next. Retakes stay available after you pass.</p>
       </div>
+
+      {loadError && (
+        <div className="exam-requirements card" style={{ borderColor: '#e74c3c' }}>
+          <h2>Could not refresh exams</h2>
+          <p>{loadError}</p>
+          <button type="button" className="btn-primary" style={{ marginTop: '0.75rem' }} onClick={() => loadExams()}>
+            Try again
+          </button>
+        </div>
+      )}
       
       {!hasAnyLessonCompleted && (
         <div className="exam-requirements card">
@@ -186,12 +191,12 @@ function ProficiencyExams() {
       </div>
       */}
 
-      {exams.length === 0 ? (
+      {exams.length === 0 && !loadError ? (
         <div className="no-exams card">
-          <h2>📭 No Exams Available</h2>
-          <p>There are no proficiency exams available yet. Check back later or contact an administrator to add exams.</p>
+          <h2>📭 No exams in Firestore yet</h2>
+          <p>Ask a teacher to add exams in <strong>Teacher Dashboard → Exams</strong>, or run the repo seed script <code>scripts/seedExams.cjs</code> if you use the default exam set.</p>
         </div>
-      ) : (
+      ) : exams.length > 0 ? (
         <div className="exams-grid">
           {exams.map((exam) => (
             <div key={exam.id} className={`exam-card card ${!exam.isUnlocked ? 'locked' : ''} ${exam.isPassed ? 'passed' : ''}`}>
@@ -256,7 +261,7 @@ function ProficiencyExams() {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
