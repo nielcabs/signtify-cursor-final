@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../auth/firebase';
@@ -24,31 +24,13 @@ function ProficiencyExams() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [hasAnyLessonCompleted, setHasAnyLessonCompleted] = useState(false);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    loadExams();
-    // Refresh when page becomes visible (user might have completed a lesson)
-    const handleVisibilityChange = () => {
-      if (!document.hidden && currentUser) {
-        loadExams();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    // Also refresh periodically (every 5 seconds) when page is visible
-    const interval = setInterval(() => {
-      if (!document.hidden && currentUser) {
-        loadExams();
-      }
-    }, 12000);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(interval);
-    };
-  }, [currentUser]);
-
-  const loadExams = async () => {
+  const loadExams = useCallback(async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setLoadError(null);
       
       // Load all exams
@@ -75,8 +57,9 @@ function ProficiencyExams() {
       // Load user profile to check which exams are passed
       let passedExams = [];
       let hasCompletedLesson = false;
-      if (currentUser) {
-        const profile = await getUserProfile(currentUser.uid);
+      const uid = currentUser?.uid;
+      if (uid) {
+        const profile = await getUserProfile(uid);
         const completedLessons = profile?.progress?.lessonsCompleted || [];
         hasCompletedLesson = completedLessons.length > 0;
         setHasAnyLessonCompleted(hasCompletedLesson);
@@ -134,14 +117,44 @@ function ProficiencyExams() {
         };
       });
       
-      setExams(examsWithStatus);
+      if (mountedRef.current) {
+        setExams(examsWithStatus);
+      }
     } catch (error) {
       console.error('Error loading exams:', error);
-      setLoadError(error?.message || 'Could not load exams. Check your connection and Firestore rules.');
+      if (mountedRef.current) {
+        setLoadError(error?.message || 'Could not load exams. Check your connection and Firestore rules.');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [currentUser?.uid]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadExams({ silent: false });
+
+    const uid = currentUser?.uid;
+    const handleVisibilityChange = () => {
+      if (!document.hidden && uid) {
+        loadExams({ silent: true });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const interval = setInterval(() => {
+      if (!document.hidden && uid) {
+        loadExams({ silent: true });
+      }
+    }, 12000);
+
+    return () => {
+      mountedRef.current = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [currentUser?.uid, loadExams]);
 
   if (loading) {
     return (
@@ -164,7 +177,7 @@ function ProficiencyExams() {
         <div className="exam-requirements card" style={{ borderColor: '#e74c3c' }}>
           <h2>Could not refresh exams</h2>
           <p>{loadError}</p>
-          <button type="button" className="btn-primary" style={{ marginTop: '0.75rem' }} onClick={() => loadExams()}>
+          <button type="button" className="btn-primary" style={{ marginTop: '0.75rem' }} onClick={() => loadExams({ silent: false })}>
             Try again
           </button>
         </div>
