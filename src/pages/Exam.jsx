@@ -30,6 +30,37 @@ const formatTime = (totalSeconds) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
+const normalizeText = (value) => String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+const inferCameraExpectedSign = (question, category) => {
+  const directAnswer = String(question?.answer || '').trim();
+  const questionText = String(question?.question || '');
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const mode = normalizeText(category) === 'alphabet'
+    ? 'letters'
+    : (normalizeText(category) === 'numbers' ? 'numbers' : 'words');
+
+  const isModeShapedAnswer = mode === 'letters'
+    ? /^[a-z]$/i.test(directAnswer)
+    : mode === 'numbers'
+      ? /^(?:[0-9]|10)$/.test(directAnswer)
+      : directAnswer.length > 0 && directAnswer.length <= 24;
+
+  if (isModeShapedAnswer) return directAnswer;
+
+  const m = questionText.match(/for\s+(.+?)\??$/i);
+  if (m?.[1]) {
+    const extracted = m[1].trim();
+    const optionMatch = options.find((opt) => normalizeText(opt) === normalizeText(extracted));
+    return optionMatch || extracted;
+  }
+
+  const optionFromQuestion = options.find((opt) => questionText.toLowerCase().includes(String(opt).toLowerCase()));
+  if (optionFromQuestion) return optionFromQuestion;
+
+  return directAnswer;
+};
+
 function Exam() {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -379,6 +410,7 @@ function Exam() {
 
   // ---- Active exam screen ----
   const question = attempt[currentIndex];
+  const cameraExpectedSign = inferCameraExpectedSign(question, exam.category);
   const answeredCount = answers.filter((a) => a !== null).length;
   const timerDanger = timeRemaining !== null && timeRemaining <= 60;
 
@@ -436,7 +468,9 @@ function Exam() {
         </div>
 
         <ExamCameraVerifier
-          expectedSign={question.answer}
+          expectedSign={cameraExpectedSign}
+          questionText={question.question}
+          candidateOptions={question.options}
           category={exam.category}
           onCorrectDetected={handleCameraCorrect}
           disabled={showResult}

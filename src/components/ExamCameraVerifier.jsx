@@ -18,6 +18,8 @@ const isLocalPredictUrl = (url) => /127\.0\.0\.1|localhost/i.test(String(url || 
 
 function ExamCameraVerifier({
   expectedSign,
+  questionText = '',
+  candidateOptions = [],
   category,
   onCorrectDetected,
   disabled = false
@@ -44,6 +46,21 @@ function ExamCameraVerifier({
   const [consecutiveTimeouts, setConsecutiveTimeouts] = useState(0);
 
   const mode = useMemo(() => modeFromCategory(category), [category]);
+
+  const expectedAliases = useMemo(() => {
+    const aliases = new Set();
+    const add = (v) => {
+      const n = normalizePrediction(v);
+      if (n) aliases.add(n);
+    };
+
+    add(expectedSign);
+    const match = String(questionText || '').match(/for\s+(.+?)\??$/i);
+    if (match?.[1]) add(match[1]);
+
+    (Array.isArray(candidateOptions) ? candidateOptions : []).forEach(add);
+    return aliases;
+  }, [candidateOptions, expectedSign, normalizePrediction, questionText]);
 
   useEffect(() => {
     expectedRef.current = normalize(expectedSign);
@@ -141,13 +158,17 @@ function ExamCameraVerifier({
     detectedRef.current = predicted;
     setConfidence(Math.round(conf * 100));
     setDetectionStatus(status);
-    if (!correctLockRef.current && predicted === expectedRef.current) {
+    const isExpected =
+      predicted === expectedRef.current ||
+      expectedAliases.has(predicted);
+
+    if (!correctLockRef.current && isExpected) {
       correctLockRef.current = true;
       setDetectionStatus('Correct sign! Moving to next question...');
       onCorrectDetected?.(predicted, conf);
     }
     return true;
-  }, [isAllowedForMode, normalizePrediction, onCorrectDetected]);
+  }, [expectedAliases, isAllowedForMode, normalizePrediction, onCorrectDetected]);
 
   const tryLocalFallback = useCallback(() => {
     const hand = primaryHandRef.current;
