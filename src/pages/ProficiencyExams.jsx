@@ -69,13 +69,13 @@ function ProficiencyExams() {
       // Create a Set of passed exam IDs for O(1) lookups
       const passedExamIds = new Set(
         passedExams
-          .filter(e => e.passed)
-          .map(e => e.examId)
+          .filter((e) => e.passed)
+          .map((e) => String(e.examId))
       );
-      
-      // Create a Map for quick exam result lookup
+
+      // Create a Map for quick exam result lookup (string keys — doc ids are strings)
       const examResultsMap = new Map(
-        passedExams.map(e => [e.examId, e])
+        passedExams.map((e) => [String(e.examId), e])
       );
       
       // Determine which exams are unlocked
@@ -84,8 +84,9 @@ function ProficiencyExams() {
       
       const examsWithStatus = examsData.map((exam, index) => {
         // Check if current exam is passed
-        const isPassed = passedExamIds.has(exam.id);
-        const currentExamResult = examResultsMap.get(exam.id);
+        const examKey = String(exam.id);
+        const isPassed = passedExamIds.has(examKey);
+        const currentExamResult = examResultsMap.get(examKey);
         
         // Determine if exam is unlocked
         let isUnlocked = false;

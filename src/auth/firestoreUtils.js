@@ -443,8 +443,8 @@ export const saveExamResult = async (uid, examId, score, totalQuestions, lessonC
       const previousExams = userData.progress?.examsPassed || [];
       
       // Check if user has already passed this exam (80% or higher)
-      hasAlreadyPassed = previousExams.some(exam => 
-        exam.examId === examId && exam.passed === true && exam.percentage >= 80
+      hasAlreadyPassed = previousExams.some((exam) =>
+        String(exam.examId) === String(examId) && exam.passed === true && exam.percentage >= 80
       );
       
       // If user has already passed, don't award points for retake

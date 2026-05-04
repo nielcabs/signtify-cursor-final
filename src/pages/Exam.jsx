@@ -96,6 +96,9 @@ function Exam() {
   const advancingRef = useRef(false);
   const currentIndexRef = useRef(0);
   const attemptLengthRef = useRef(0);
+  /** Always read latest rows in finishExam (avoids stale closure from setTimeout after camera submit). */
+  const attemptRef = useRef(null);
+  const answersRef = useRef([]);
 
   // ---- Data loading ----
 
@@ -125,7 +128,9 @@ function Exam() {
       if (!currentUser) return;
       try {
         const profile = await getUserProfile(currentUser.uid);
-        const examAttempts = (profile?.progress?.examsPassed || []).filter((e) => e.examId === examId);
+        const examAttempts = (profile?.progress?.examsPassed || []).filter(
+          (e) => String(e.examId) === String(examId)
+        );
         if (examAttempts.length > 0) {
           setBestScore(Math.max(...examAttempts.map((e) => e.percentage)));
         }
@@ -156,6 +161,14 @@ function Exam() {
     setTimeRemaining(minutes * 60);
   }, [exam]);
 
+  useEffect(() => {
+    attemptRef.current = attempt;
+  }, [attempt]);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
   // ---- Score computation ----
 
   const { correctCount, percentage, passingScore } = useMemo(() => {
@@ -172,7 +185,8 @@ function Exam() {
   // ---- Finishing ----
 
   const finishExam = useCallback(async ({ auto = false } = {}) => {
-    if (finishingRef.current || !attempt) return;
+    const att = attemptRef.current;
+    if (finishingRef.current || !att?.length) return;
     finishingRef.current = true;
 
     if (timerRef.current) {
@@ -186,20 +200,20 @@ function Exam() {
     if (currentUser && exam) {
       setSaving(true);
       try {
-        // Recompute score directly from answers to avoid stale closure
+        const ans = answersRef.current;
         let correct = 0;
-        for (let i = 0; i < attempt.length; i++) {
-          if (answers[i] !== null && answers[i] === attempt[i].answer) correct += 1;
+        for (let i = 0; i < att.length; i++) {
+          if (ans[i] !== null && ans[i] === att[i].answer) correct += 1;
         }
         await saveExamResult(
           currentUser.uid,
           examId,
           correct,
-          attempt.length,
+          att.length,
           exam.category,
         );
 
-        const newBest = Math.round((correct / attempt.length) * 100);
+        const newBest = Math.round((correct / att.length) * 100);
         setBestScore((prev) => (prev === null ? newBest : Math.max(prev, newBest)));
       } catch (err) {
         console.error('Error saving exam result:', err);
@@ -208,7 +222,7 @@ function Exam() {
         setSaving(false);
       }
     }
-  }, [attempt, answers, currentUser, exam, examId, toast]);
+  }, [currentUser, exam, examId, toast]);
 
   // ---- Timer ----
 
@@ -263,6 +277,7 @@ function Exam() {
     setAnswers((prev) => {
       const next = [...prev];
       next[idx] = q.answer;
+      answersRef.current = next;
       return next;
     });
 
