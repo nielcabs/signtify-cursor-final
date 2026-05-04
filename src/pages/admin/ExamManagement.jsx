@@ -5,6 +5,18 @@ import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import '../../styles/pages/AdminManagement.css';
 
+const EXAM_CATEGORY_OPTIONS = [
+  { value: 'alphabet', label: 'Alphabet' },
+  { value: 'greetings', label: 'Greetings' },
+  { value: 'numbers', label: 'Numbers' },
+];
+
+const LEGACY_EXAM_CATEGORY_LABELS = {
+  'daily-conversation': 'Daily Conversation',
+  common: 'Common Words',
+  comprehensive: 'Comprehensive',
+};
+
 function ExamManagement() {
   const { currentUser } = useAuth();
   const toast = useToast();
@@ -329,12 +341,16 @@ function ExamManagement() {
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 >
-                  <option value="alphabet">Alphabet</option>
-                  <option value="greetings">Greetings</option>
-                  <option value="numbers">Numbers</option>
-                  <option value="daily-conversation">Daily Conversation</option>
-                  <option value="common">Common Words</option>
-                  <option value="comprehensive">Comprehensive</option>
+                  {EXAM_CATEGORY_OPTIONS.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                  {formData.category &&
+                    !EXAM_CATEGORY_OPTIONS.some((o) => o.value === formData.category) && (
+                    <option value={formData.category}>
+                      {LEGACY_EXAM_CATEGORY_LABELS[formData.category] || formData.category}
+                      {' '}(legacy — pick Alphabet, Greetings, or Numbers when you update)
+                    </option>
+                  )}
                 </select>
               </div>
 
