@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as fp from 'fingerpose';
+import Handsigns from '../../handsign-tensorflow-master/components/handsigns/index.js';
+import { getFoldedHandScore, getLocalLetterHeuristic } from '../utils/liveLetterHeuristics.js';
 import { useToast } from './ui/Toast';
 
 const SEQUENCE_LENGTH = 30;
@@ -11,6 +14,19 @@ const LOCAL_LETTER_VOTE_MAX_AGE_MS = 1200;
 const LOCAL_NUMBER_VOTE_WINDOW = 5;
 const LOCAL_NUMBER_MIN_VOTES = 2;
 const LOCAL_NUMBER_VOTE_MAX_AGE_MS = 1200;
+
+/** Same Fingerpose letter thresholds as `LiveTranslate.jsx`. */
+const FINGERPOSE_MATCH_SCORE = 3.8;
+const FINGERPOSE_MIN_CONFIDENCE = 0.16;
+const FINGERPOSE_FOLDED_MIN_CONFIDENCE = 0.1;
+const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
+const EXAM_FP_LETTER_VOTE_WINDOW = 8;
+const EXAM_FP_LETTER_MIN_VOTES = 2;
+const EXAM_FP_LETTER_VOTE_MAX_AGE_MS = 1400;
+
+function mirrorHandLandmarks(hand) {
+  return hand.map(([x, y, z]) => [1 - x, y, z]);
+}
 
 const normalize = (value) => String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
@@ -38,6 +54,9 @@ function ExamCameraVerifier({
   const frameSendInFlightRef = useRef(false);
   const sequenceRef = useRef([]);
   const primaryHandRef = useRef(null);
+  const gestureEstimatorRef = useRef(null);
+  const fingerposeHandsRef = useRef([]);
+  const examFpLetterVoteQueueRef = useRef([]);
   const localWordVoteQueueRef = useRef([]);
   const localLetterVoteQueueRef = useRef([]);
   const localNumberVoteQueueRef = useRef([]);
@@ -80,10 +99,28 @@ function ExamCameraVerifier({
     localWordVoteQueueRef.current = [];
     localLetterVoteQueueRef.current = [];
     localNumberVoteQueueRef.current = [];
+    examFpLetterVoteQueueRef.current = [];
     setCameraError(null);
     setDetectedSign('');
     setConfidence(0);
   }, [expectedSign]);
+
+  useEffect(() => {
+    const gestures = [
+      Handsigns.aSign, Handsigns.bSign, Handsigns.cSign, Handsigns.dSign, Handsigns.eSign, Handsigns.fSign,
+      Handsigns.gSign, Handsigns.hSign, Handsigns.iSign, Handsigns.jSign, Handsigns.kSign, Handsigns.lSign,
+      Handsigns.mSign, Handsigns.nSign, Handsigns.oSign, Handsigns.pSign, Handsigns.qSign, Handsigns.rSign,
+      Handsigns.sSign, Handsigns.tSign, Handsigns.uSign, Handsigns.vSign, Handsigns.wSign, Handsigns.xSign,
+      Handsigns.ySign, Handsigns.zSign
+    ].filter(Boolean);
+
+    if (gestures.length) {
+      gestureEstimatorRef.current = new fp.GestureEstimator(gestures);
+    } else {
+      gestureEstimatorRef.current = null;
+      console.warn('Handsign definitions are missing; exam Fingerpose is disabled.');
+    }
+  }, []);
 
   const isAllowedForMode = useCallback((value) => {
     const v = normalize(value);
@@ -122,27 +159,77 @@ function ExamCameraVerifier({
     return null;
   }, []);
 
-  const getLocalLetterPrediction = useCallback((hand) => {
-    if (!hand || hand.length < 21) return null;
-    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
-    const indexUp = isUp(8, 6);
-    const middleUp = isUp(12, 10);
-    const ringUp = isUp(16, 14);
-    const pinkyUp = isUp(20, 18);
-    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
-    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
-    const indexMiddleDist = dist2D(hand[8], hand[12]);
-    const thumbIndexDist = dist2D(hand[4], hand[8]);
+  const estimateFingerposeFromLandmarks = useCallback((landmarks) => {
+    if (!gestureEstimatorRef.current) return null;
+    const estimated = gestureEstimatorRef.current.estimate(landmarks, FINGERPOSE_MATCH_SCORE);
+    if (!estimated?.gestures?.length) return null;
 
-    if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: 'a', confidence: 0.62 };
-    if (!thumbOpen && indexUp && middleUp && ringUp && pinkyUp) return { sign: 'b', confidence: 0.64 };
-    if (thumbOpen && indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: 'l', confidence: 0.66 };
-    if (!thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp && thumbIndexDist < palmWidth * 0.18) return { sign: 'o', confidence: 0.57 };
-    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist < (palmWidth * 0.26)) return { sign: 'u', confidence: 0.63 };
-    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist >= (palmWidth * 0.26)) return { sign: 'v', confidence: 0.63 };
-    if (thumbOpen && !indexUp && !middleUp && !ringUp && pinkyUp) return { sign: 'y', confidence: 0.64 };
-    if (indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: 'd', confidence: 0.56 };
-    return null;
+    const best = estimated.gestures.reduce((max, gesture) => (
+      gesture.confidence > max.confidence ? gesture : max
+    ));
+
+    const rawConfidence = Number(best?.confidence ?? 0);
+    const normalizedConfidence = rawConfidence > 1 ? (rawConfidence / 10) : rawConfidence;
+    const sign = String(best?.name || '').toLowerCase();
+    if (!sign) return null;
+
+    return {
+      sign,
+      confidence: Math.max(0, Math.min(1, normalizedConfidence))
+    };
+  }, []);
+
+  const getExamFingerposePrediction = useCallback(() => {
+    if (!gestureEstimatorRef.current) return null;
+    const hands = fingerposeHandsRef.current;
+    if (!hands?.length) return null;
+
+    let bestCandidate = null;
+    for (const h of hands) {
+      const candidates = [
+        estimateFingerposeFromLandmarks(h),
+        estimateFingerposeFromLandmarks(mirrorHandLandmarks(h))
+      ].filter(Boolean);
+
+      for (const candidate of candidates) {
+        if (!bestCandidate || candidate.confidence > bestCandidate.confidence) {
+          bestCandidate = { ...candidate, hand: h };
+        }
+      }
+    }
+    return bestCandidate;
+  }, [estimateFingerposeFromLandmarks]);
+
+  const getExamSmoothedLetterPrediction = useCallback((sign, confidence) => {
+    const now = Date.now();
+    const queue = [...examFpLetterVoteQueueRef.current, { sign, confidence, at: now }]
+      .filter((item) => now - item.at <= EXAM_FP_LETTER_VOTE_MAX_AGE_MS)
+      .slice(-EXAM_FP_LETTER_VOTE_WINDOW);
+    examFpLetterVoteQueueRef.current = queue;
+
+    const grouped = queue.reduce((acc, item) => {
+      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+      acc[item.sign].count += 1;
+      acc[item.sign].confSum += item.confidence;
+      return acc;
+    }, {});
+
+    const ranked = Object.entries(grouped)
+      .map(([candidateSign, stats]) => ({
+        sign: candidateSign,
+        count: stats.count,
+        avgConfidence: stats.confSum / stats.count
+      }))
+      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+
+    const best = ranked[0];
+    if (!best || best.count < EXAM_FP_LETTER_MIN_VOTES) return null;
+
+    return {
+      sign: best.sign,
+      confidence: Math.max(confidence, best.avgConfidence),
+      votes: best.count
+    };
   }, []);
 
   /** Same motion + shape heuristics as `LiveTranslate` words mode (local-first). */
@@ -278,35 +365,87 @@ function ExamCameraVerifier({
 
   const tryExamLocalLetterVoted = useCallback(() => {
     const hand = primaryHandRef.current;
-    const local = getLocalLetterPrediction(hand);
-    if (!local) return false;
-    const sign = normalize(String(local.sign));
-    if (!isAllowedForMode(sign)) return false;
-    if (!(sign === expectedRef.current || expectedAliases.has(sign))) {
-      setDetectionStatus(`Hold steady — need letter "${expectedRef.current.toUpperCase()}"`);
-      return false;
+    const exp = expectedRef.current;
+    const allowedLetter = (sign) => {
+      const n = normalize(String(sign));
+      if (!/^[a-z]$/.test(n)) return false;
+      return n === exp || expectedAliases.has(n);
+    };
+
+    let statusFromLocal = false;
+
+    if (hand?.length >= 21) {
+      const local = getLocalLetterHeuristic(hand, exp);
+      if (local && !allowedLetter(local.sign)) {
+        setDetectionStatus(`Hold steady — need letter "${exp.toUpperCase()}"`);
+        return false;
+      }
+      if (local && allowedLetter(local.sign)) {
+        const sign = normalize(String(local.sign));
+        if (!isAllowedForMode(sign)) return false;
+        const now = Date.now();
+        const queue = [...localLetterVoteQueueRef.current, { sign, confidence: local.confidence, at: now }]
+          .filter((item) => now - item.at <= LOCAL_LETTER_VOTE_MAX_AGE_MS)
+          .slice(-LOCAL_LETTER_VOTE_WINDOW);
+        localLetterVoteQueueRef.current = queue;
+        const grouped = queue.reduce((acc, item) => {
+          if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+          acc[item.sign].count += 1;
+          acc[item.sign].confSum += item.confidence;
+          return acc;
+        }, {});
+        const ranked = Object.entries(grouped)
+          .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
+          .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+        const best = ranked[0];
+        if (best && best.count >= LOCAL_LETTER_MIN_VOTES && allowedLetter(best.sign)) {
+          return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
+        }
+        setDetectionStatus(`Stabilizing letter… (${best?.count || 1}/${LOCAL_LETTER_MIN_VOTES})`);
+        statusFromLocal = true;
+      }
     }
-    const now = Date.now();
-    const queue = [...localLetterVoteQueueRef.current, { sign, confidence: local.confidence, at: now }]
-      .filter((item) => now - item.at <= LOCAL_LETTER_VOTE_MAX_AGE_MS)
-      .slice(-LOCAL_LETTER_VOTE_WINDOW);
-    localLetterVoteQueueRef.current = queue;
-    const grouped = queue.reduce((acc, item) => {
-      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
-      acc[item.sign].count += 1;
-      acc[item.sign].confSum += item.confidence;
-      return acc;
-    }, {});
-    const ranked = Object.entries(grouped)
-      .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
-      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
-    const best = ranked[0];
-    if (!best || best.count < LOCAL_LETTER_MIN_VOTES) {
-      setDetectionStatus(`Stabilizing letter… (${best?.count || 1}/${LOCAL_LETTER_MIN_VOTES})`);
-      return false;
+
+    const fpBest = getExamFingerposePrediction();
+    if (fpBest) {
+      let effectiveConfidence = fpBest.confidence;
+      const foldedScore = getFoldedHandScore(fpBest.hand);
+      const foldedLetterBoost =
+        foldedScore >= 0.45 && FOLDED_FINGER_LETTERS.has(fpBest.sign);
+
+      if (foldedLetterBoost) {
+        effectiveConfidence = Math.min(1, effectiveConfidence + 0.18);
+      }
+
+      const minFingerposeConfidence = foldedLetterBoost
+        ? FINGERPOSE_FOLDED_MIN_CONFIDENCE
+        : FINGERPOSE_MIN_CONFIDENCE;
+
+      if (effectiveConfidence >= minFingerposeConfidence) {
+        const smoothed = getExamSmoothedLetterPrediction(fpBest.sign, effectiveConfidence);
+        if (smoothed && allowedLetter(smoothed.sign)) {
+          return applyDetected(
+            smoothed.sign,
+            smoothed.confidence,
+            `Detected (fingerpose ${smoothed.votes}/${EXAM_FP_LETTER_VOTE_WINDOW})`
+          );
+        }
+        setDetectionStatus('Stabilizing letters…');
+        return false;
+      }
     }
-    return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
-  }, [applyDetected, expectedAliases, getLocalLetterPrediction, isAllowedForMode]);
+
+    if (!statusFromLocal) {
+      setDetectionStatus(`Hold steady — need letter "${exp.toUpperCase()}"`);
+    }
+    return false;
+  }, [
+    applyDetected,
+    expectedAliases,
+    getExamFingerposePrediction,
+    getExamSmoothedLetterPrediction,
+    isAllowedForMode
+  ]);
 
   const tryExamLocalNumberVoted = useCallback(() => {
     const hand = primaryHandRef.current;
@@ -415,6 +554,8 @@ function ExamCameraVerifier({
     setIsCameraActive(false);
     setDetectionStatus('Camera stopped');
     sequenceRef.current = [];
+    fingerposeHandsRef.current = [];
+    examFpLetterVoteQueueRef.current = [];
     localWordVoteQueueRef.current = [];
     localLetterVoteQueueRef.current = [];
     localNumberVoteQueueRef.current = [];
@@ -490,6 +631,7 @@ function ExamCameraVerifier({
           .filter(Boolean)
           .map((hand) => hand.map((point) => [point.x, point.y, point.z]));
         primaryHandRef.current = candidateHands[0] || null;
+        fingerposeHandsRef.current = candidateHands;
       });
 
       cameraRef.current = new window.Camera(videoRef.current, {
@@ -516,7 +658,7 @@ function ExamCameraVerifier({
       setIsCameraActive(false);
       toast.error('Could not access camera for exam detection.');
     }
-  }, [category, loadMediaPipeScripts, runPrediction, toast]);
+  }, [loadMediaPipeScripts, runPrediction, toast]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
