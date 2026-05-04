@@ -207,27 +207,36 @@ function Exam() {
 
   // ---- Handlers ----
 
-  const handleAnswer = (option) => {
-    if (showResult) return;
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    attemptLengthRef.current = attempt?.length || 0;
+  }, [attempt]);
+
+  const handleCameraCorrect = useCallback(() => {
+    if (!attempt || showResult || advancingRef.current) return;
+    const idx = currentIndexRef.current;
+    const q = attempt[idx];
+    if (!q) return;
+
+    advancingRef.current = true;
     setAnswers((prev) => {
       const next = [...prev];
-      next[currentIndex] = option;
+      next[idx] = q.answer;
       return next;
     });
-  };
 
-  const handleNext = () => {
-    if (!attempt) return;
-    if (currentIndex < attempt.length - 1) {
-      setCurrentIndex((i) => i + 1);
-    } else {
-      finishExam({ auto: false });
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentIndex > 0) setCurrentIndex((i) => i - 1);
-  };
+    setTimeout(() => {
+      if (idx < attemptLengthRef.current - 1) {
+        setCurrentIndex((prev) => Math.min(prev + 1, attemptLengthRef.current - 1));
+      } else {
+        finishExam({ auto: false });
+      }
+      advancingRef.current = false;
+    }, 700);
+  }, [attempt, finishExam, showResult]);
 
   // ---- Rendering ----
 
@@ -370,35 +379,8 @@ function Exam() {
 
   // ---- Active exam screen ----
   const question = attempt[currentIndex];
-  const selectedAnswer = answers[currentIndex];
   const answeredCount = answers.filter((a) => a !== null).length;
   const timerDanger = timeRemaining !== null && timeRemaining <= 60;
-
-  currentIndexRef.current = currentIndex;
-  attemptLengthRef.current = attempt.length;
-
-  const handleCameraCorrect = useCallback(() => {
-    if (!attempt || showResult || advancingRef.current) return;
-    const idx = currentIndexRef.current;
-    const q = attempt[idx];
-    if (!q) return;
-
-    advancingRef.current = true;
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[idx] = q.answer;
-      return next;
-    });
-
-    setTimeout(() => {
-      if (idx < attemptLengthRef.current - 1) {
-        setCurrentIndex((prev) => Math.min(prev + 1, attemptLengthRef.current - 1));
-      } else {
-        finishExam({ auto: false });
-      }
-      advancingRef.current = false;
-    }, 700);
-  }, [attempt, finishExam, showResult]);
 
   return (
     <div className="quiz-page">
@@ -460,33 +442,10 @@ function Exam() {
           disabled={showResult}
         />
 
-        <div className="options-grid">
-          {question.options.map((option, index) => (
-            <button
-              key={`${currentIndex}-${index}-${option}`}
-              className={`option-button ${selectedAnswer === option ? 'selected' : ''}`}
-              onClick={() => handleAnswer(option)}
-              disabled={advancingRef.current}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-
         <div className="quiz-actions">
-          <button
-            className="secondary"
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-          >
-            Previous
-          </button>
-          <button
-            onClick={handleNext}
-            disabled={selectedAnswer === null}
-          >
-            {currentIndex < attempt.length - 1 ? 'Next Question' : 'Finish Exam'}
-          </button>
+          <p style={{ margin: 0, color: '#666', textAlign: 'center', width: '100%' }}>
+            Camera-only mode: perform the correct sign to continue automatically.
+          </p>
         </div>
       </div>
     </div>
