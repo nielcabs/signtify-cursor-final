@@ -73,11 +73,6 @@ const DAILY_CONVERSATION_QUESTIONS = [
   { sign: 'Help', options: ['Help', 'Yes', 'No', 'Thank You'] },
   { sign: 'Thank You', options: ['Thank You', 'Yes', 'No', 'Help'] },
   { sign: 'Mama', options: ['Mama', 'Thank You', 'Hello', 'Help'] },
-  {
-    sign: 'I love you',
-    question: 'What is the word that you can generate with I, L, Y?',
-    options: ['I love you', 'Thank You', 'Help', 'Yes'],
-  },
 ].map(({ sign, options, question }) => ({
   question: question || 'What sign is this?',
   answer: sign,

@@ -36,6 +36,23 @@ const inferCameraExpectedSign = (question, category) => {
   const directAnswer = String(question?.answer || '').trim();
   const questionText = String(question?.question || '');
   const options = Array.isArray(question?.options) ? question.options : [];
+
+  const ilyOption = options.find((o) => /i\s*love\s*you/i.test(String(o).trim()));
+  if (ilyOption) {
+    const qLower = questionText.toLowerCase();
+    const dCompact = directAnswer.toLowerCase().replace(/\s+/g, ' ').trim();
+    const answerIsCommaIly = /^i\s*,\s*l\s*,\s*y\.?$/.test(dCompact) || dCompact.replace(/\s/g, '') === 'i,l,y';
+    const answerIsILoveYou = /i\s*love\s*you/i.test(directAnswer);
+    if (
+      answerIsCommaIly ||
+      answerIsILoveYou ||
+      /i\s*,\s*l\s*,\s*y/.test(qLower) ||
+      (/converted to/i.test(qLower) && (answerIsCommaIly || answerIsILoveYou || /i\s*,\s*l\s*,\s*y/.test(qLower)))
+    ) {
+      return ilyOption;
+    }
+  }
+
   const mode = normalizeText(category) === 'alphabet'
     ? 'letters'
     : (normalizeText(category) === 'numbers' ? 'numbers' : 'words');
@@ -74,13 +91,34 @@ const inferCameraExpectedSign = (question, category) => {
   const optionFromQuestion = options.find((opt) => questionText.toLowerCase().includes(String(opt).toLowerCase()));
   if (optionFromQuestion) return optionFromQuestion;
 
-  // "I, L, Y" trivia → correct option is usually "I love you" when present
   if (/i\s*,\s*l\s*,\s*y/i.test(questionText)) {
     const ilyOpt = options.find((opt) => /i\s*love\s*you/i.test(String(opt)));
     if (ilyOpt) return ilyOpt;
   }
 
   return directAnswer;
+};
+
+/**
+ * ILY uses word-mode detection. Alphabet-category exams that include an ILY trivia row must not use letter-only mode.
+ */
+const resolveCameraDetectionCategory = (question, examCategory) => {
+  const cat = normalizeText(examCategory || '');
+  if (cat !== 'alphabet') return examCategory;
+  const cam = inferCameraExpectedSign(question, examCategory);
+  const exp = normalizeText(cam);
+  const qt = normalizeText(String(question?.question || ''));
+  const opts = Array.isArray(question?.options) ? question.options : [];
+  const hasIlyOption = opts.some((o) => /i\s*love\s*you/i.test(String(o)));
+  if (
+    exp.includes('i love you') ||
+    /i\s*,\s*l\s*,\s*y/.test(exp) ||
+    /i\s*,\s*l\s*,\s*y/.test(qt) ||
+    (/converted to/.test(qt) && hasIlyOption)
+  ) {
+    return 'daily-conversation';
+  }
+  return examCategory;
 };
 
 function Exam() {
@@ -448,6 +486,7 @@ function Exam() {
   // ---- Active exam screen ----
   const question = attempt[currentIndex];
   const cameraExpectedSign = inferCameraExpectedSign(question, exam.category);
+  const cameraDetectionCategory = resolveCameraDetectionCategory(question, exam.category);
   const answeredCount = answers.filter((a) => a !== null).length;
   const timerDanger = timeRemaining !== null && timeRemaining <= 60;
 
@@ -508,7 +547,7 @@ function Exam() {
           expectedSign={cameraExpectedSign}
           questionText={question.question}
           candidateOptions={question.options}
-          category={exam.category}
+          category={cameraDetectionCategory}
           onCorrectDetected={handleCameraCorrect}
           disabled={showResult}
         />

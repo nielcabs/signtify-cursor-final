@@ -70,7 +70,20 @@ function ExamCameraVerifier({
   const [detectionStatus, setDetectionStatus] = useState('Camera ready');
   const [detectedSign, setDetectedSign] = useState('');
   const [confidence, setConfidence] = useState(0);
-  const mode = useMemo(() => modeFromCategory(category), [category]);
+  const mode = useMemo(() => {
+    const base = modeFromCategory(category);
+    const exp = normalize(String(expectedSign || ''));
+    const qt = normalize(String(questionText || ''));
+    if (base === 'letters' && (
+      exp.includes('i love you') ||
+      /i\s*,\s*l\s*,\s*y/.test(exp) ||
+      /i\s*,\s*l\s*,\s*y/.test(qt) ||
+      (/converted to/.test(qt) && /i\s*love\s*you|ily/i.test(exp + ' ' + qt))
+    )) {
+      return 'words';
+    }
+    return base;
+  }, [category, expectedSign, questionText]);
 
   const normalizePrediction = useCallback((value) => {
     const v = normalize(value);
