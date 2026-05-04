@@ -6,15 +6,6 @@ import { inferLocalDetectionMode } from '../utils/inferLocalDetectionMode.js';
 import { useToast } from './ui/Toast';
 
 const SEQUENCE_LENGTH = 30;
-const LOCAL_WORD_VOTE_WINDOW = 6;
-const LOCAL_WORD_MIN_VOTES = 2;
-const LOCAL_WORD_VOTE_MAX_AGE_MS = 1600;
-const LOCAL_LETTER_VOTE_WINDOW = 5;
-const LOCAL_LETTER_MIN_VOTES = 2;
-const LOCAL_LETTER_VOTE_MAX_AGE_MS = 1200;
-const LOCAL_NUMBER_VOTE_WINDOW = 5;
-const LOCAL_NUMBER_MIN_VOTES = 2;
-const LOCAL_NUMBER_VOTE_MAX_AGE_MS = 1200;
 
 /** Same Fingerpose letter thresholds as `LiveTranslate.jsx`. */
 const FINGERPOSE_MATCH_SCORE = 3.8;
@@ -24,6 +15,11 @@ const FOLDED_FINGER_LETTERS = new Set(['a', 's', 't', 'm', 'n', 'e']);
 const EXAM_FP_LETTER_VOTE_WINDOW = 8;
 const EXAM_FP_LETTER_MIN_VOTES = 2;
 const EXAM_FP_LETTER_VOTE_MAX_AGE_MS = 1400;
+/** Combined letter / number / word pipelines vote together toward the expected label */
+const UNIFIED_VOTE_WINDOW = 10;
+const UNIFIED_MIN_VOTES = 2;
+const UNIFIED_VOTE_MAX_AGE_MS = 1600;
+const FINGERPOSE_PREVIEW_MIN = 0.06;
 
 function mirrorHandLandmarks(hand) {
   return hand.map(([x, y, z]) => [1 - x, y, z]);
@@ -49,9 +45,7 @@ function ExamCameraVerifier({
   const gestureEstimatorRef = useRef(null);
   const fingerposeHandsRef = useRef([]);
   const examFpLetterVoteQueueRef = useRef([]);
-  const localWordVoteQueueRef = useRef([]);
-  const localLetterVoteQueueRef = useRef([]);
-  const localNumberVoteQueueRef = useRef([]);
+  const unifiedVoteQueueRef = useRef([]);
   const scriptsLoadedRef = useRef(false);
   const correctLockRef = useRef(false);
   const detectedRef = useRef('');
@@ -103,9 +97,7 @@ function ExamCameraVerifier({
   useEffect(() => {
     expectedRef.current = normalize(expectedSign);
     correctLockRef.current = false;
-    localWordVoteQueueRef.current = [];
-    localLetterVoteQueueRef.current = [];
-    localNumberVoteQueueRef.current = [];
+    unifiedVoteQueueRef.current = [];
     examFpLetterVoteQueueRef.current = [];
     setCameraError(null);
     setDetectedSign('');
@@ -128,14 +120,6 @@ function ExamCameraVerifier({
       console.warn('Handsign definitions are missing; exam Fingerpose is disabled.');
     }
   }, []);
-
-  const isAllowedForMode = useCallback((value) => {
-    const v = normalize(value);
-    if (!v) return false;
-    if (mode === 'letters') return /^[a-z]$/.test(v);
-    if (mode === 'numbers') return /^(?:[0-9]|10)$/.test(v);
-    return true;
-  }, [mode]);
 
   const dist2D = (a, b) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0));
 
@@ -316,10 +300,9 @@ function ExamCameraVerifier({
 
   const applyDetected = useCallback((sign, conf, status = 'Sign detected') => {
     const predicted = normalizePrediction(sign);
-    if (!isAllowedForMode(predicted)) return false;
     setDetectedSign(predicted);
     detectedRef.current = predicted;
-    setConfidence(Math.round(conf * 100));
+    setConfidence(Math.round(Math.min(1, conf) * 100));
     setDetectionStatus(status);
     const isExpected =
       predicted === expectedRef.current ||
@@ -331,27 +314,83 @@ function ExamCameraVerifier({
       onCorrectDetected?.(predicted, conf);
     }
     return true;
-  }, [expectedAliases, isAllowedForMode, normalizePrediction, onCorrectDetected]);
+  }, [expectedAliases, normalizePrediction, onCorrectDetected]);
 
-  const tryExamLocalWordVoted = useCallback(() => {
+  /**
+   * Run number + letter + word + Fingerpose locals together; accept whichever hypothesis matches the target sign.
+   * Avoids brittle "category → single pipeline" routing and surfaces live preview from the strongest raw guess.
+   */
+  const tryUnifiedExpectedDetection = useCallback(() => {
     const hand = primaryHandRef.current;
-    const localWord = getLocalWordHeuristicExam(hand);
-    if (!localWord) return false;
+    if (!hand?.length || correctLockRef.current) return false;
 
-    const sign = normalizePrediction(localWord.sign);
-    if (!isAllowedForMode(sign)) return false;
+    const exp = expectedRef.current;
+    const matches = (rawSign) => {
+      const s = normalizePrediction(rawSign);
+      return s === exp || expectedAliases.has(s);
+    };
 
-    const matchesExpected = sign === expectedRef.current || expectedAliases.has(sign);
-    if (!matchesExpected) {
-      setDetectionStatus(`Hold steady — need "${expectedRef.current}"`);
+    const num = getLocalNumberPrediction(hand);
+    const letter = getLocalLetterHeuristic(hand, exp);
+    const word = getLocalWordHeuristicExam(hand);
+    const fp = getExamFingerposePrediction();
+
+    const previewPool = [];
+    if (num) previewPool.push(num);
+    if (letter) previewPool.push(letter);
+    if (word) previewPool.push(word);
+    if (fp && fp.confidence >= FINGERPOSE_PREVIEW_MIN) {
+      previewPool.push({ sign: fp.sign, confidence: fp.confidence });
+    }
+
+    if (previewPool.length && !correctLockRef.current) {
+      const top = previewPool.reduce((a, b) => (b.confidence > a.confidence ? b : a));
+      const pv = normalizePrediction(top.sign);
+      setDetectedSign(pv);
+      setConfidence(Math.round(Math.min(1, top.confidence) * 100));
+    }
+
+    const matching = [];
+    if (num && matches(num.sign)) matching.push(num);
+    if (letter && matches(letter.sign)) matching.push(letter);
+    if (word && matches(word.sign)) matching.push(word);
+
+    if (fp) {
+      let eff = fp.confidence;
+      const foldedScore = getFoldedHandScore(fp.hand);
+      const foldedBoost = foldedScore >= 0.45 && FOLDED_FINGER_LETTERS.has(fp.sign);
+      if (foldedBoost) eff = Math.min(1, eff + 0.18);
+      const minFp = foldedBoost ? FINGERPOSE_FOLDED_MIN_CONFIDENCE : FINGERPOSE_MIN_CONFIDENCE;
+      const relaxedMin = /^[a-z]$/.test(exp) ? Math.min(minFp, 0.12) : minFp;
+
+      if (/^[a-z]$/.test(exp)) {
+        if (eff >= relaxedMin) {
+          const smoothed = getExamSmoothedLetterPrediction(fp.sign, eff);
+          if (smoothed && matches(smoothed.sign)) {
+            matching.push({ sign: smoothed.sign, confidence: smoothed.confidence });
+          }
+        }
+      } else if (eff >= minFp && matches(fp.sign)) {
+        matching.push({ sign: fp.sign, confidence: eff });
+      }
+    }
+
+    if (!matching.length) {
+      setDetectionStatus(
+        previewPool.length
+          ? `Auto — hold "${exp}" (seeing "${normalizePrediction(previewPool.reduce((a, b) => (b.confidence > a.confidence ? b : a)).sign)}")`
+          : `Auto — hold "${exp}" (no match yet)`
+      );
       return false;
     }
 
+    const best = matching.reduce((a, b) => (b.confidence > a.confidence ? b : a));
+    const bestSign = normalizePrediction(best.sign);
     const now = Date.now();
-    const queue = [...localWordVoteQueueRef.current, { sign, confidence: localWord.confidence, at: now }]
-      .filter((item) => now - item.at <= LOCAL_WORD_VOTE_MAX_AGE_MS)
-      .slice(-LOCAL_WORD_VOTE_WINDOW);
-    localWordVoteQueueRef.current = queue;
+    const queue = [...unifiedVoteQueueRef.current, { sign: bestSign, confidence: best.confidence, at: now }]
+      .filter((item) => now - item.at <= UNIFIED_VOTE_MAX_AGE_MS)
+      .slice(-UNIFIED_VOTE_WINDOW);
+    unifiedVoteQueueRef.current = queue;
 
     const grouped = queue.reduce((acc, item) => {
       if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
@@ -364,138 +403,25 @@ function ExamCameraVerifier({
       .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
       .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
 
-    const best = ranked[0];
-    if (!best || best.count < LOCAL_WORD_MIN_VOTES) {
-      setDetectionStatus(`Stabilizing… (${best?.count || 1}/${LOCAL_WORD_MIN_VOTES})`);
+    const winner = ranked[0];
+    if (!winner || winner.count < UNIFIED_MIN_VOTES) {
+      setDetectionStatus(`Auto — stabilizing "${bestSign}" (${winner?.count || 1}/${UNIFIED_MIN_VOTES})`);
       return false;
     }
 
-    if (best.sign !== expectedRef.current && !expectedAliases.has(best.sign)) return false;
-
-    return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
-  }, [applyDetected, expectedAliases, getLocalWordHeuristicExam, isAllowedForMode, normalizePrediction]);
-
-  const tryExamLocalLetterVoted = useCallback(() => {
-    const hand = primaryHandRef.current;
-    const exp = expectedRef.current;
-    const allowedLetter = (sign) => {
-      const n = normalize(String(sign));
-      if (!/^[a-z]$/.test(n)) return false;
-      return n === exp || expectedAliases.has(n);
-    };
-
-    let statusFromLocal = false;
-
-    if (hand?.length >= 21) {
-      const local = getLocalLetterHeuristic(hand, exp);
-      if (local && !allowedLetter(local.sign)) {
-        setDetectionStatus(`Hold steady — need letter "${exp.toUpperCase()}"`);
-        return false;
-      }
-      if (local && allowedLetter(local.sign)) {
-        const sign = normalize(String(local.sign));
-        if (!isAllowedForMode(sign)) return false;
-        const now = Date.now();
-        const queue = [...localLetterVoteQueueRef.current, { sign, confidence: local.confidence, at: now }]
-          .filter((item) => now - item.at <= LOCAL_LETTER_VOTE_MAX_AGE_MS)
-          .slice(-LOCAL_LETTER_VOTE_WINDOW);
-        localLetterVoteQueueRef.current = queue;
-        const grouped = queue.reduce((acc, item) => {
-          if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
-          acc[item.sign].count += 1;
-          acc[item.sign].confSum += item.confidence;
-          return acc;
-        }, {});
-        const ranked = Object.entries(grouped)
-          .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
-          .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
-        const best = ranked[0];
-        if (best && best.count >= LOCAL_LETTER_MIN_VOTES && allowedLetter(best.sign)) {
-          return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
-        }
-        setDetectionStatus(`Stabilizing letter… (${best?.count || 1}/${LOCAL_LETTER_MIN_VOTES})`);
-        statusFromLocal = true;
-      }
-    }
-
-    const fpBest = getExamFingerposePrediction();
-    if (fpBest) {
-      let effectiveConfidence = fpBest.confidence;
-      const foldedScore = getFoldedHandScore(fpBest.hand);
-      const foldedLetterBoost =
-        foldedScore >= 0.45 && FOLDED_FINGER_LETTERS.has(fpBest.sign);
-
-      if (foldedLetterBoost) {
-        effectiveConfidence = Math.min(1, effectiveConfidence + 0.18);
-      }
-
-      const minFingerposeConfidence = foldedLetterBoost
-        ? FINGERPOSE_FOLDED_MIN_CONFIDENCE
-        : FINGERPOSE_MIN_CONFIDENCE;
-
-      if (effectiveConfidence >= minFingerposeConfidence) {
-        const smoothed = getExamSmoothedLetterPrediction(fpBest.sign, effectiveConfidence);
-        if (smoothed && allowedLetter(smoothed.sign)) {
-          return applyDetected(
-            smoothed.sign,
-            smoothed.confidence,
-            `Detected (fingerpose ${smoothed.votes}/${EXAM_FP_LETTER_VOTE_WINDOW})`
-          );
-        }
-        setDetectionStatus('Stabilizing letters…');
-        return false;
-      }
-    }
-
-    if (!statusFromLocal) {
-      setDetectionStatus(`Hold steady — need letter "${exp.toUpperCase()}"`);
-    }
-    return false;
+    return applyDetected(winner.sign, winner.avgConfidence, 'Matched (auto)');
   }, [
     applyDetected,
     expectedAliases,
     getExamFingerposePrediction,
     getExamSmoothedLetterPrediction,
-    isAllowedForMode
+    getLocalLetterHeuristic,
+    getLocalNumberPrediction,
+    getLocalWordHeuristicExam,
+    normalizePrediction,
   ]);
 
-  const tryExamLocalNumberVoted = useCallback(() => {
-    const hand = primaryHandRef.current;
-    const local = getLocalNumberPrediction(hand);
-    if (!local) return false;
-    const sign = normalize(String(local.sign));
-    if (!isAllowedForMode(sign)) return false;
-    if (!(sign === expectedRef.current || expectedAliases.has(sign))) {
-      setDetectionStatus(`Hold steady — need "${expectedRef.current}"`);
-      return false;
-    }
-    const now = Date.now();
-    const queue = [...localNumberVoteQueueRef.current, { sign, confidence: local.confidence, at: now }]
-      .filter((item) => now - item.at <= LOCAL_NUMBER_VOTE_MAX_AGE_MS)
-      .slice(-LOCAL_NUMBER_VOTE_WINDOW);
-    localNumberVoteQueueRef.current = queue;
-    const grouped = queue.reduce((acc, item) => {
-      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
-      acc[item.sign].count += 1;
-      acc[item.sign].confSum += item.confidence;
-      return acc;
-    }, {});
-    const ranked = Object.entries(grouped)
-      .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
-      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
-    const best = ranked[0];
-    if (!best || best.count < LOCAL_NUMBER_MIN_VOTES) {
-      setDetectionStatus(`Stabilizing number… (${best?.count || 1}/${LOCAL_NUMBER_MIN_VOTES})`);
-      return false;
-    }
-    return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
-  }, [applyDetected, expectedAliases, getLocalNumberPrediction, isAllowedForMode]);
-
-  const tryLocalFallback = useCallback(() => {
-    if (mode === 'numbers') return tryExamLocalNumberVoted();
-    if (mode === 'letters') return tryExamLocalLetterVoted();
-    return tryExamLocalWordVoted();
-  }, [mode, tryExamLocalLetterVoted, tryExamLocalNumberVoted, tryExamLocalWordVoted]);
+  const tryLocalFallback = useCallback(() => tryUnifiedExpectedDetection(), [tryUnifiedExpectedDetection]);
 
   const loadMediaPipeScripts = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -585,9 +511,7 @@ function ExamCameraVerifier({
     sequenceRef.current = [];
     fingerposeHandsRef.current = [];
     examFpLetterVoteQueueRef.current = [];
-    localWordVoteQueueRef.current = [];
-    localLetterVoteQueueRef.current = [];
-    localNumberVoteQueueRef.current = [];
+    unifiedVoteQueueRef.current = [];
     frameSendInFlightRef.current = false;
   }, []);
 
