@@ -50,7 +50,14 @@ const inferCameraExpectedSign = (question, category) => {
 
   const m = questionText.match(/for\s+(.+?)\??$/i);
   if (m?.[1]) {
-    const extracted = m[1].trim();
+    const extracted = m[1].trim().replace(/\?+$/, '');
+    const optionMatch = options.find((opt) => normalizeText(opt) === normalizeText(extracted));
+    return optionMatch || extracted;
+  }
+
+  const how = questionText.match(/do\s+a\s+(.+?)\s+sign\s+language/i);
+  if (how?.[1]) {
+    const extracted = how[1].trim().replace(/\?+$/, '');
     const optionMatch = options.find((opt) => normalizeText(opt) === normalizeText(extracted));
     return optionMatch || extracted;
   }

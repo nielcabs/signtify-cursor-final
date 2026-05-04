@@ -4,6 +4,9 @@ import { useToast } from './ui/Toast';
 const FLASK_SERVER_URL = (import.meta.env.VITE_FLASK_PREDICT_URL || 'http://127.0.0.1:5000/predict').trim();
 const BACKEND_TIMEOUT_MS = 12000;
 const SEQUENCE_LENGTH = 30;
+const LOCAL_WORD_VOTE_WINDOW = 6;
+const LOCAL_WORD_MIN_VOTES = 2;
+const LOCAL_WORD_VOTE_MAX_AGE_MS = 1600;
 
 const normalize = (value) => String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
@@ -33,6 +36,7 @@ function ExamCameraVerifier({
   const frameSendInFlightRef = useRef(false);
   const sequenceRef = useRef([]);
   const primaryHandRef = useRef(null);
+  const localWordVoteQueueRef = useRef([]);
   const scriptsLoadedRef = useRef(false);
   const correctLockRef = useRef(false);
   const detectedRef = useRef('');
@@ -71,6 +75,9 @@ function ExamCameraVerifier({
   useEffect(() => {
     expectedRef.current = normalize(expectedSign);
     correctLockRef.current = false;
+    localWordVoteQueueRef.current = [];
+    setConsecutiveTimeouts(0);
+    setCameraError(null);
     setDetectedSign('');
     setConfidence(0);
   }, [expectedSign]);
@@ -135,19 +142,41 @@ function ExamCameraVerifier({
     return null;
   }, []);
 
-  const getLocalWordPrediction = useCallback((hand) => {
+  /** Same motion + shape heuristics as `LiveTranslate` words mode (local-first). */
+  const getLocalWordHeuristicExam = useCallback((hand) => {
     if (!hand || hand.length < 21) return null;
+
     const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
-    const indexUp = isUp(8, 6);
-    const middleUp = isUp(12, 10);
-    const ringUp = isUp(16, 14);
-    const pinkyUp = isUp(20, 18);
+    const indexUp = isUp(8, 6, 0.02);
+    const middleUp = isUp(12, 10, 0.02);
+    const ringUp = isUp(16, 14, 0.02);
+    const pinkyUp = isUp(20, 18, 0.02);
     const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08 || hand[4][1] < (hand[3][1] - 0.015);
+    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
+    const thumbIndexDist = dist2D(hand[4], hand[8]);
+    const thumbMiddleDist = dist2D(hand[4], hand[12]);
+
     const allOpen = indexUp && middleUp && ringUp && pinkyUp;
     const fistLike = !indexUp && !middleUp && !ringUp && !pinkyUp;
-    const target = expectedRef.current;
+    const noShape = indexUp && middleUp && !ringUp && !pinkyUp &&
+      thumbIndexDist < (palmWidth * 0.34) && thumbMiddleDist < (palmWidth * 0.36);
 
-    // Estimate simple wrist motion from recent sequence (dominant hand each frame).
+    const handEnergy = (frame63) => {
+      let s = 0;
+      for (let i = 0; i < 63; i += 1) s += Math.abs(frame63[i] || 0);
+      return s;
+    };
+
+    const lastFrame = sequenceRef.current.length
+      ? sequenceRef.current[sequenceRef.current.length - 1]
+      : null;
+    let twoHandsActive = false;
+    if (lastFrame && lastFrame.length >= 126) {
+      const le = handEnergy(lastFrame.slice(0, 63));
+      const re = handEnergy(lastFrame.slice(63, 126));
+      twoHandsActive = le > 2.2 && re > 2.2;
+    }
+
     const recent = sequenceRef.current.slice(-8);
     let motionX = 0;
     let motionY = 0;
@@ -168,44 +197,18 @@ function ExamCameraVerifier({
       motionY /= (wristYs.length - 1);
     }
 
-    // Target-aware local detection to avoid false "thank you" on every open palm.
-    if (target === 'hello') {
-      if (allOpen && motionX > 0.02 && motionX >= (motionY * 0.85)) {
-        return { sign: 'hello', confidence: 0.66 };
-      }
-      return null;
-    }
-    if (target === 'goodbye') {
-      if (allOpen && motionX > 0.035) {
-        return { sign: 'goodbye', confidence: 0.68 };
-      }
-      return null;
-    }
-    if (target === 'thank you') {
-      if (allOpen && motionY > 0.012 && motionX < 0.028) {
-        return { sign: 'thank you', confidence: 0.62 };
-      }
-      return null;
-    }
-    if (target === 'yes') {
-      if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.60 };
-      return null;
-    }
-    if (target === 'help') {
-      if (fistLike && thumbOpen && motionY > 0.02) return { sign: 'help', confidence: 0.66 };
-      return null;
-    }
-    if (target === 'no') {
-      const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
-      const thumbIndexDist = dist2D(hand[4], hand[8]);
-      const thumbMiddleDist = dist2D(hand[4], hand[12]);
-      if (indexUp && middleUp && !ringUp && !pinkyUp && thumbIndexDist < (palmWidth * 0.34) && thumbMiddleDist < (palmWidth * 0.36)) {
-        return { sign: 'no', confidence: 0.64 };
-      }
-      return null;
-    }
+    const motionSum = motionX + motionY;
+    const wristY = hand[0][1];
 
-    // Unknown target word: avoid false positives instead of guessing.
+    if (noShape) return { sign: 'no', confidence: 0.70 };
+    if (fistLike && thumbOpen && motionY > 0.02) return { sign: 'help', confidence: 0.67 };
+    if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.68 };
+    if (twoHandsActive && allOpen && motionSum > 0.045) return { sign: 'happy birthday', confidence: 0.64 };
+    if (allOpen && wristY < 0.40 && motionSum < 0.022) return { sign: 'mama', confidence: 0.60 };
+    if (allOpen && motionX > 0.035) return { sign: 'goodbye', confidence: 0.68 };
+    if (allOpen && motionX > 0.02 && motionX >= motionY * 0.85) return { sign: 'hello', confidence: 0.66 };
+    if (allOpen && motionY > 0.012 && motionX < 0.028 && motionSum < 0.04) return { sign: 'thank you', confidence: 0.62 };
+    if (allOpen) return { sign: 'thank you', confidence: 0.58 };
     return null;
   }, []);
 
@@ -228,16 +231,62 @@ function ExamCameraVerifier({
     return true;
   }, [expectedAliases, isAllowedForMode, normalizePrediction, onCorrectDetected]);
 
+  const tryExamLocalWordVoted = useCallback(() => {
+    const hand = primaryHandRef.current;
+    const localWord = getLocalWordHeuristicExam(hand);
+    if (!localWord) return false;
+
+    const sign = normalizePrediction(localWord.sign);
+    if (!isAllowedForMode(sign)) return false;
+
+    const matchesExpected = sign === expectedRef.current || expectedAliases.has(sign);
+    if (!matchesExpected) {
+      setDetectionStatus(`Hold steady — need "${expectedRef.current}"`);
+      return false;
+    }
+
+    const now = Date.now();
+    const queue = [...localWordVoteQueueRef.current, { sign, confidence: localWord.confidence, at: now }]
+      .filter((item) => now - item.at <= LOCAL_WORD_VOTE_MAX_AGE_MS)
+      .slice(-LOCAL_WORD_VOTE_WINDOW);
+    localWordVoteQueueRef.current = queue;
+
+    const grouped = queue.reduce((acc, item) => {
+      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+      acc[item.sign].count += 1;
+      acc[item.sign].confSum += item.confidence;
+      return acc;
+    }, {});
+
+    const ranked = Object.entries(grouped)
+      .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
+      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+
+    const best = ranked[0];
+    if (!best || best.count < LOCAL_WORD_MIN_VOTES) {
+      setDetectionStatus(`Stabilizing… (${best?.count || 1}/${LOCAL_WORD_MIN_VOTES})`);
+      return false;
+    }
+
+    if (best.sign !== expectedRef.current && !expectedAliases.has(best.sign)) return false;
+
+    return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
+  }, [applyDetected, expectedAliases, getLocalWordHeuristicExam, isAllowedForMode, normalizePrediction]);
+
   const tryLocalFallback = useCallback(() => {
     const hand = primaryHandRef.current;
-    let local = null;
-    if (mode === 'numbers') local = getLocalNumberPrediction(hand);
-    else if (mode === 'letters') local = getLocalLetterPrediction(hand);
-    else local = getLocalWordPrediction(hand);
-
-    if (!local) return false;
-    return applyDetected(local.sign, local.confidence, 'Detected (local)');
-  }, [applyDetected, getLocalLetterPrediction, getLocalNumberPrediction, getLocalWordPrediction, mode]);
+    if (mode === 'numbers') {
+      const local = getLocalNumberPrediction(hand);
+      if (!local) return false;
+      return applyDetected(local.sign, local.confidence, 'Detected (local)');
+    }
+    if (mode === 'letters') {
+      const local = getLocalLetterPrediction(hand);
+      if (!local) return false;
+      return applyDetected(local.sign, local.confidence, 'Detected (local)');
+    }
+    return tryExamLocalWordVoted();
+  }, [applyDetected, getLocalLetterPrediction, getLocalNumberPrediction, mode, tryExamLocalWordVoted]);
 
   const loadMediaPipeScripts = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -308,6 +357,7 @@ function ExamCameraVerifier({
     setIsCameraActive(false);
     setDetectionStatus('Camera stopped');
     sequenceRef.current = [];
+    localWordVoteQueueRef.current = [];
     frameSendInFlightRef.current = false;
   }, []);
 
@@ -315,6 +365,16 @@ function ExamCameraVerifier({
     if (frameSendInFlightRef.current) return;
     if (tryLocalFallback()) {
       setConsecutiveTimeouts(0);
+      return;
+    }
+    // Words mode matches Live Translate: local heuristics + voting only (no Render cold starts).
+    if (mode === 'words') {
+      setConsecutiveTimeouts(0);
+      if (sequenceRef.current.length < 8) {
+        setDetectionStatus(`Collecting motion ${sequenceRef.current.length}/8`);
+      } else {
+        setDetectionStatus('Local detection — wave or move clearly if stuck');
+      }
       return;
     }
     if (sequenceRef.current.length < SEQUENCE_LENGTH) {
@@ -369,7 +429,8 @@ function ExamCameraVerifier({
     try {
       const host = window?.location?.hostname || '';
       const isProductionHost = host && host !== 'localhost' && host !== '127.0.0.1';
-      if (isProductionHost && isLocalPredictUrl(FLASK_SERVER_URL)) {
+      const examMode = modeFromCategory(category);
+      if (isProductionHost && isLocalPredictUrl(FLASK_SERVER_URL) && examMode !== 'words') {
         setCameraError(
           'Prediction backend is misconfigured. Set VITE_FLASK_PREDICT_URL in Vercel to your Render /predict endpoint.'
         );
@@ -450,7 +511,7 @@ function ExamCameraVerifier({
       setIsCameraActive(false);
       toast.error('Could not access camera for exam detection.');
     }
-  }, [loadMediaPipeScripts, runPrediction, toast]);
+  }, [category, loadMediaPipeScripts, runPrediction, toast]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
