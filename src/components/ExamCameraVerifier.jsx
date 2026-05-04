@@ -75,6 +75,7 @@ function ExamCameraVerifier({
   const normalizePrediction = useCallback((value) => {
     const v = normalize(value);
     if (v === 'thanks' || v === 'thank_you' || v === 'ty') return 'thank you';
+    if (v === 'ily' || v === 'ilu') return 'i love you';
     return v;
   }, []);
 
@@ -90,6 +91,16 @@ function ExamCameraVerifier({
     if (match?.[1]) add(match[1]);
 
     (Array.isArray(candidateOptions) ? candidateOptions : []).forEach(add);
+
+    const qt = String(questionText || '').toLowerCase();
+    if (qt.includes('i love you') || qt.includes('i, l, y') || qt.includes("'i, l, y'") || qt.includes('"i, l, y"')) {
+      add('I love you');
+      add('ily');
+    }
+    if (normalize(expectedSign) === 'i love you') {
+      add('ily');
+      add('ilu');
+    }
     return aliases;
   }, [candidateOptions, expectedSign, normalizePrediction, questionText]);
 
@@ -289,6 +300,11 @@ function ExamCameraVerifier({
 
     const motionSum = motionX + motionY;
     const wristY = hand[0][1];
+
+    // ASL "I love you" — thumb + index + pinky up, middle + ring down (distinct from open-palm waves).
+    if (thumbOpen && indexUp && !middleUp && !ringUp && pinkyUp) {
+      return { sign: 'i love you', confidence: 0.74 };
+    }
 
     if (noShape) return { sign: 'no', confidence: 0.70 };
     if (fistLike && thumbOpen && motionY > 0.02) return { sign: 'help', confidence: 0.67 };
@@ -540,15 +556,32 @@ function ExamCameraVerifier({
 
   const stopCamera = useCallback(() => {
     if (cameraRef.current) {
-      cameraRef.current.stop();
+      try {
+        cameraRef.current.stop();
+      } catch (e) {
+        console.warn('Exam camera stop:', e);
+      }
       cameraRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video?.srcObject) {
+      try {
+        video.srcObject.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        console.warn('Exam video tracks stop:', e);
+      }
+      video.srcObject = null;
     }
     if (predictionIntervalRef.current) {
       clearInterval(predictionIntervalRef.current);
       predictionIntervalRef.current = null;
     }
     if (handsRef.current) {
-      handsRef.current.close();
+      try {
+        handsRef.current.close();
+      } catch (e) {
+        console.warn('Exam Hands close:', e);
+      }
       handsRef.current = null;
     }
     setIsCameraActive(false);
@@ -574,7 +607,7 @@ function ExamCameraVerifier({
       return;
     }
     if (mode === 'words') {
-      setDetectionStatus('Local detection — wave or move clearly if stuck');
+      setDetectionStatus('Local detection — hold the handshape steady (small side-to-side motion helps for hello/goodbye)');
     } else if (mode === 'letters') {
       setDetectionStatus('Local detection — hold the letter shape steady');
     } else {
@@ -705,9 +738,36 @@ function ExamCameraVerifier({
             inset: 0,
             width: '100%',
             height: '100%',
-            display: isCameraActive ? 'block' : 'none'
+            display: isCameraActive ? 'block' : 'none',
+            pointerEvents: 'none'
           }}
         />
+        {isCameraActive && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              padding: '10px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              background: 'linear-gradient(transparent, rgba(0,0,0,0.65))',
+              zIndex: 4,
+              pointerEvents: 'none'
+            }}
+          >
+            <button
+              type="button"
+              className="secondary"
+              onClick={stopCamera}
+              style={{ pointerEvents: 'auto', minWidth: '140px', fontWeight: 600 }}
+            >
+              Stop Camera
+            </button>
+          </div>
+        )}
       </div>
 
       {cameraError && <p style={{ color: '#c0392b' }}>{cameraError}</p>}
@@ -718,13 +778,6 @@ function ExamCameraVerifier({
         <span><strong>Confidence:</strong> {confidence}%</span>
       </div>
 
-      {isCameraActive && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <button type="button" className="secondary" onClick={stopCamera}>
-            Stop Camera
-          </button>
-        </div>
-      )}
     </div>
   );
 }

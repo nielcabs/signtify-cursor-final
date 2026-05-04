@@ -78,6 +78,7 @@ function LiveTranslate() {
     'yes',
     'no',
     'help',
+    'i love you',
   ]);
   const isWord = (value) => WORD_SIGNS.has(String(value || '').toLowerCase());
 
@@ -85,6 +86,7 @@ function LiveTranslate() {
   const normalizeWordLabel = (raw) => {
     const k = String(raw || '').toLowerCase().trim();
     if (k === 'thanks' || k === 'thank_you' || k === 'ty') return 'thank you';
+    if (k === 'ily' || k === 'ilu') return 'i love you';
     return k;
   };
 
@@ -380,6 +382,10 @@ function LiveTranslate() {
 
     const motionSum = motionX + motionY;
     const wristY = hand[0][1];
+
+    if (thumbOpen && indexUp && !middleUp && !ringUp && pinkyUp) {
+      return { sign: 'i love you', confidence: 0.74 };
+    }
 
     if (noShape) return { sign: 'no', confidence: 0.70 };
 

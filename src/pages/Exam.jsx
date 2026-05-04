@@ -74,6 +74,12 @@ const inferCameraExpectedSign = (question, category) => {
   const optionFromQuestion = options.find((opt) => questionText.toLowerCase().includes(String(opt).toLowerCase()));
   if (optionFromQuestion) return optionFromQuestion;
 
+  // "I, L, Y" trivia → correct option is usually "I love you" when present
+  if (/i\s*,\s*l\s*,\s*y/i.test(questionText)) {
+    const ilyOpt = options.find((opt) => /i\s*love\s*you/i.test(String(opt)));
+    if (ilyOpt) return ilyOpt;
+  }
+
   return directAnswer;
 };
 
