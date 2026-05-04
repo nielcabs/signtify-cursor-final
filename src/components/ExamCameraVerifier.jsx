@@ -47,6 +47,12 @@ function ExamCameraVerifier({
 
   const mode = useMemo(() => modeFromCategory(category), [category]);
 
+  const normalizePrediction = useCallback((value) => {
+    const v = normalize(value);
+    if (v === 'thanks' || v === 'thank_you' || v === 'ty') return 'thank you';
+    return v;
+  }, []);
+
   const expectedAliases = useMemo(() => {
     const aliases = new Set();
     const add = (v) => {
@@ -76,12 +82,6 @@ function ExamCameraVerifier({
     if (mode === 'numbers') return /^(?:[0-9]|10)$/.test(v);
     return true;
   }, [mode]);
-
-  const normalizePrediction = useCallback((value) => {
-    const v = normalize(value);
-    if (v === 'thanks' || v === 'thank_you' || v === 'ty') return 'thank you';
-    return v;
-  }, []);
 
   const dist2D = (a, b) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0));
 
