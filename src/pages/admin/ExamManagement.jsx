@@ -31,7 +31,6 @@ function ExamManagement() {
   const [currentQuestion, setCurrentQuestion] = useState({
     question: '',
     answer: '',
-    options: ['', '', '', ''],
     imageUrl: '',
     handIcon: ''
   });
@@ -77,7 +76,6 @@ function ExamManagement() {
     setCurrentQuestion({
       question: '',
       answer: '',
-      options: ['', '', '', ''],
       imageUrl: '',
       handIcon: ''
     });
@@ -103,31 +101,30 @@ function ExamManagement() {
   };
 
   const handleAddQuestion = () => {
-    if (!currentQuestion.question || !currentQuestion.answer) {
-      toast.warning('Please fill in question and answer');
-      return;
-    }
-
-    const validOptions = currentQuestion.options.filter(opt => opt.trim() !== '');
-    if (validOptions.length < 1) {
-      toast.warning('Enter at least one sign label (the correct sign must appear in that list)');
-      return;
-    }
-
-    if (!validOptions.includes(currentQuestion.answer)) {
-      toast.warning('Choose the correct sign in the dropdown — it must match one of the labels you entered');
+    const prompt = currentQuestion.question.trim();
+    const ans = currentQuestion.answer.trim();
+    if (!prompt || !ans) {
+      toast.warning('Fill in the question prompt and the correct sign to detect');
       return;
     }
 
     setFormData({
       ...formData,
-      questions: [...formData.questions, { ...currentQuestion, options: validOptions }]
+      questions: [
+        ...formData.questions,
+        {
+          question: prompt,
+          answer: ans,
+          options: [ans],
+          imageUrl: (currentQuestion.imageUrl || '').trim(),
+          handIcon: currentQuestion.handIcon || ''
+        }
+      ]
     });
 
     setCurrentQuestion({
       question: '',
       answer: '',
-      options: ['', '', '', ''],
       imageUrl: '',
       handIcon: ''
     });
@@ -145,7 +142,6 @@ function ExamManagement() {
     setCurrentQuestion({
       question: questionToEdit.question,
       answer: questionToEdit.answer,
-      options: questionToEdit.options.length === 4 ? questionToEdit.options : [...questionToEdit.options, '', '', '', ''].slice(0, 4),
       imageUrl: questionToEdit.imageUrl || '',
       handIcon: questionToEdit.handIcon || ''
     });
@@ -167,6 +163,15 @@ function ExamManagement() {
     const examId = editingExam ? editingExam.id : formData.id || `exam_${Date.now()}`;
 
     try {
+      const normalizedQuestions = formData.questions.map((q) => {
+        const ans = String(q.answer || '').trim();
+        return {
+          ...q,
+          answer: ans,
+          options: ans ? [ans] : []
+        };
+      });
+
       await saveExam(
         examId,
         {
@@ -177,7 +182,7 @@ function ExamManagement() {
           passingScore: formData.passingScore,
           timeLimit: formData.timeLimit,
           order: formData.order,
-          questions: formData.questions
+          questions: normalizedQuestions
         },
         currentUser?.uid,
         currentUser?.email
@@ -386,8 +391,7 @@ function ExamManagement() {
                 <div className="exam-camera-hint" role="note">
                   <strong>Camera-based exam</strong>
                   <p>
-                    Students perform the sign on camera. Only the <strong>correct sign label</strong> you choose below is used for scoring.
-                    Extra labels are optional (e.g. similar signs you want recorded beside the question)—they are not shown as buttons and do not substitute for the correct answer.
+                    Students perform the sign on camera. Enter the one label the detector should match (same spelling you use in Live Translate / lessons, e.g. <strong>A</strong>, <strong>Hello</strong>, <strong>5</strong>).
                   </p>
                 </div>
                 <div className="form-group">
@@ -435,54 +439,17 @@ function ExamManagement() {
                 )}
 
                 <div className="form-group">
-                  <label>Sign labels</label>
-                  <p className="field-hint-text">
-                    Minimum: include the correct sign as one label (you can add more for reference). Grading uses only the dropdown choice, not the extra labels.
-                  </p>
-                  {currentQuestion.options.map((option, index) => (
-                    <div key={index} className="sign-label-row">
-                      <span className="sign-label-index" aria-hidden="true">{index + 1}</span>
-                      <input
-                        type="text"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...currentQuestion.options];
-                          newOptions[index] = e.target.value;
-                          const newQuestion = { ...currentQuestion, options: newOptions };
-                          if (currentQuestion.answer === option) {
-                            newQuestion.answer = e.target.value;
-                          }
-                          setCurrentQuestion(newQuestion);
-                        }}
-                        placeholder={`Label ${index + 1} (e.g. word or letter)`}
-                        className="option-input"
-                      />
-                    </div>
-                  ))}
-                  <div className="form-group correct-sign-select">
-                    <label htmlFor="exam-correct-sign">Correct sign to detect (camera must match this label)</label>
-                    <select
-                      id="exam-correct-sign"
-                      value={
-                        currentQuestion.options.some((o) => o === currentQuestion.answer && String(currentQuestion.answer).trim())
-                          ? currentQuestion.answer
-                          : ''
-                      }
-                      onChange={(e) => setCurrentQuestion({ ...currentQuestion, answer: e.target.value })}
-                    >
-                      <option value="">— Choose after typing labels above —</option>
-                      {currentQuestion.options
-                        .map((o, i) => ({ o: String(o).trim(), i }))
-                        .filter(({ o }) => o.length > 0)
-                        .map(({ o, i }) => (
-                          <option key={i} value={currentQuestion.options[i]}>
-                            {o}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                  <label htmlFor="exam-correct-sign-text">Correct sign to detect</label>
+                  <input
+                    id="exam-correct-sign-text"
+                    type="text"
+                    value={currentQuestion.answer}
+                    onChange={(e) => setCurrentQuestion({ ...currentQuestion, answer: e.target.value })}
+                    placeholder="e.g. A, Hello, 5"
+                    autoComplete="off"
+                  />
                   <small className="field-hint-text">
-                    The correct label must match how signs are named in the app (e.g. letters A–Z, words like Hello, numbers 1–10).
+                    Must match how the app names this sign (letters, common words, or numbers 0–10). This is the only label used for scoring.
                   </small>
                 </div>
 
@@ -514,8 +481,6 @@ function ExamManagement() {
                         </div>
                       )}
                       <small><strong>Correct sign (camera):</strong> {q.answer}</small>
-                      <br />
-                      <small><strong>All labels:</strong> {q.options.join(', ')}</small>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
                       <button
