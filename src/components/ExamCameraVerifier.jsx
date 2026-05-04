@@ -145,9 +145,67 @@ function ExamCameraVerifier({
     const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08 || hand[4][1] < (hand[3][1] - 0.015);
     const allOpen = indexUp && middleUp && ringUp && pinkyUp;
     const fistLike = !indexUp && !middleUp && !ringUp && !pinkyUp;
+    const target = expectedRef.current;
 
-    if (allOpen) return { sign: 'thank you', confidence: 0.58 };
-    if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.60 };
+    // Estimate simple wrist motion from recent sequence (dominant hand each frame).
+    const recent = sequenceRef.current.slice(-8);
+    let motionX = 0;
+    let motionY = 0;
+    if (recent.length >= 2) {
+      const wristXs = recent.map((frame) => {
+        const leftEnergy = Math.abs(frame[0]) + Math.abs(frame[1]) + Math.abs(frame[2]);
+        const rightEnergy = Math.abs(frame[63]) + Math.abs(frame[64]) + Math.abs(frame[65]);
+        return leftEnergy >= rightEnergy ? frame[0] : frame[63];
+      });
+      const wristYs = recent.map((frame) => {
+        const leftEnergy = Math.abs(frame[0]) + Math.abs(frame[1]) + Math.abs(frame[2]);
+        const rightEnergy = Math.abs(frame[63]) + Math.abs(frame[64]) + Math.abs(frame[65]);
+        return leftEnergy >= rightEnergy ? frame[1] : frame[64];
+      });
+      for (let i = 1; i < wristXs.length; i += 1) motionX += Math.abs(wristXs[i] - wristXs[i - 1]);
+      for (let i = 1; i < wristYs.length; i += 1) motionY += Math.abs(wristYs[i] - wristYs[i - 1]);
+      motionX /= (wristXs.length - 1);
+      motionY /= (wristYs.length - 1);
+    }
+
+    // Target-aware local detection to avoid false "thank you" on every open palm.
+    if (target === 'hello') {
+      if (allOpen && motionX > 0.02 && motionX >= (motionY * 0.85)) {
+        return { sign: 'hello', confidence: 0.66 };
+      }
+      return null;
+    }
+    if (target === 'goodbye') {
+      if (allOpen && motionX > 0.035) {
+        return { sign: 'goodbye', confidence: 0.68 };
+      }
+      return null;
+    }
+    if (target === 'thank you') {
+      if (allOpen && motionY > 0.012 && motionX < 0.028) {
+        return { sign: 'thank you', confidence: 0.62 };
+      }
+      return null;
+    }
+    if (target === 'yes') {
+      if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.60 };
+      return null;
+    }
+    if (target === 'help') {
+      if (fistLike && thumbOpen && motionY > 0.02) return { sign: 'help', confidence: 0.66 };
+      return null;
+    }
+    if (target === 'no') {
+      const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
+      const thumbIndexDist = dist2D(hand[4], hand[8]);
+      const thumbMiddleDist = dist2D(hand[4], hand[12]);
+      if (indexUp && middleUp && !ringUp && !pinkyUp && thumbIndexDist < (palmWidth * 0.34) && thumbMiddleDist < (palmWidth * 0.36)) {
+        return { sign: 'no', confidence: 0.64 };
+      }
+      return null;
+    }
+
+    // Unknown target word: avoid false positives instead of guessing.
     return null;
   }, []);
 
