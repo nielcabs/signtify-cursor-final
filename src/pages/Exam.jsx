@@ -37,12 +37,13 @@ const inferCameraExpectedSign = (question, category) => {
   const questionText = String(question?.question || '');
   const options = Array.isArray(question?.options) ? question.options : [];
 
+  const qLower = questionText.toLowerCase();
+  const dCompact = directAnswer.toLowerCase().replace(/\s+/g, ' ').trim();
+  const answerIsCommaIly = /^i\s*,\s*l\s*,\s*y\.?$/.test(dCompact) || dCompact.replace(/\s/g, '') === 'i,l,y';
+  const answerIsILoveYou = /i\s*love\s*you/i.test(directAnswer);
+
   const ilyOption = options.find((o) => /i\s*love\s*you/i.test(String(o).trim()));
   if (ilyOption) {
-    const qLower = questionText.toLowerCase();
-    const dCompact = directAnswer.toLowerCase().replace(/\s+/g, ' ').trim();
-    const answerIsCommaIly = /^i\s*,\s*l\s*,\s*y\.?$/.test(dCompact) || dCompact.replace(/\s/g, '') === 'i,l,y';
-    const answerIsILoveYou = /i\s*love\s*you/i.test(directAnswer);
     if (
       answerIsCommaIly ||
       answerIsILoveYou ||
@@ -51,6 +52,15 @@ const inferCameraExpectedSign = (question, category) => {
     ) {
       return ilyOption;
     }
+  }
+
+  /** Bad Firestore rows sometimes omit "I love you" in options — camera still needs this phrase for ILY detection. */
+  if (
+    answerIsCommaIly ||
+    answerIsILoveYou ||
+    (/converted to/i.test(qLower) && (/i\s*,\s*l\s*,\s*y/.test(qLower) || answerIsCommaIly || answerIsILoveYou))
+  ) {
+    return 'I love you';
   }
 
   const mode = normalizeText(category) === 'alphabet'
@@ -114,7 +124,7 @@ const resolveCameraDetectionCategory = (question, examCategory) => {
     exp.includes('i love you') ||
     /i\s*,\s*l\s*,\s*y/.test(exp) ||
     /i\s*,\s*l\s*,\s*y/.test(qt) ||
-    (/converted to/.test(qt) && hasIlyOption)
+    (/converted to/.test(qt) && (hasIlyOption || exp.includes('i love you')))
   ) {
     return 'daily-conversation';
   }

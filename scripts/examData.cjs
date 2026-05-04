@@ -1,6 +1,10 @@
 /**
  * Canonical Signtify proficiency exam definitions.
  *
+ * Exam 1 → id `exam_alphabet` (order 1). Exam 4 → id `exam_daily_conversation` (order 4).
+ * If the live site shows wrong titles, question counts, or junk exams (e.g. placeholder text),
+ * Firestore was edited manually or never re-seeded — run `node scripts/seedExams.cjs --force`.
+ *
  * This module is imported by the Node seed script (`seedExams.cjs`).
  *
  * Schema (matches Firestore `exams/{id}` docs + existing `ExamManagement.jsx`):
@@ -73,8 +77,8 @@ const DAILY_CONVERSATION_QUESTIONS = [
   { sign: 'Help', options: ['Help', 'Yes', 'No', 'Thank You'] },
   { sign: 'Thank You', options: ['Thank You', 'Yes', 'No', 'Help'] },
   { sign: 'Mama', options: ['Mama', 'Thank You', 'Hello', 'Help'] },
-].map(({ sign, options, question }) => ({
-  question: question || 'What sign is this?',
+].map(({ sign, options }) => ({
+  question: 'What sign is this?',
   answer: sign,
   options,
   handIcon: '💬',
