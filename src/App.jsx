@@ -142,6 +142,12 @@ function App() {
                     <Exam />
                   </ProtectedRoute>
                 } />
+                {/* Legacy deep-link compatibility: some clients use /exam/exam/:examId */}
+                <Route path="/exam/exam/:examId" element={
+                  <ProtectedRoute>
+                    <Exam />
+                  </ProtectedRoute>
+                } />
                 <Route path="/dictionary" element={
                   <ProtectedRoute>
                     <Dictionary />
