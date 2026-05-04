@@ -9,22 +9,21 @@
  * Each question: { question, answer, options[], imageUrl?, handIcon? }
  */
 
+/**
+ * Letters chosen for clear, stable handshapes (local + Fingerpose in the app).
+ * Avoids easily confused pairs (e.g. M/N, P/Q) and very folded letters for the camera step.
+ */
 const ALPHABET_QUESTIONS = [
-  { letter: 'A', options: ['A', 'B', 'C', 'D'] },
-  { letter: 'C', options: ['C', 'D', 'E', 'F'] },
-  { letter: 'E', options: ['E', 'F', 'G', 'H'] },
-  { letter: 'G', options: ['F', 'G', 'H', 'I'] },
-  { letter: 'I', options: ['I', 'J', 'K', 'L'] },
-  { letter: 'K', options: ['J', 'K', 'L', 'M'] },
-  { letter: 'L', options: ['K', 'L', 'M', 'N'] },
-  { letter: 'M', options: ['L', 'M', 'N', 'O'] },
-  { letter: 'O', options: ['M', 'N', 'O', 'P'] },
-  { letter: 'Q', options: ['P', 'Q', 'R', 'S'] },
-  { letter: 'S', options: ['R', 'S', 'T', 'U'] },
-  { letter: 'U', options: ['T', 'U', 'V', 'W'] },
-  { letter: 'W', options: ['U', 'V', 'W', 'X'] },
-  { letter: 'Y', options: ['X', 'Y', 'Z', 'A'] },
-  { letter: 'Z', options: ['W', 'X', 'Y', 'Z'] },
+  { letter: 'A', options: ['A', 'B', 'L', 'O'] },
+  { letter: 'B', options: ['A', 'B', 'L', 'Y'] },
+  { letter: 'C', options: ['B', 'C', 'O', 'L'] },
+  { letter: 'I', options: ['I', 'L', 'Y', 'W'] },
+  { letter: 'L', options: ['I', 'L', 'Y', 'O'] },
+  { letter: 'O', options: ['O', 'C', 'A', 'U'] },
+  { letter: 'U', options: ['U', 'V', 'W', 'I'] },
+  { letter: 'V', options: ['U', 'V', 'W', 'Y'] },
+  { letter: 'W', options: ['U', 'V', 'W', 'B'] },
+  { letter: 'Y', options: ['Y', 'I', 'L', 'A'] },
 ].map(({ letter, options }) => ({
   question: `What letter is this sign?`,
   answer: letter,
@@ -32,19 +31,14 @@ const ALPHABET_QUESTIONS = [
   handIcon: '✋',
 }));
 
+/** Phrases that match in-app camera / Live Translate word detection (motion + shape heuristics). */
 const GREETINGS_QUESTIONS = [
-  { sign: 'Hello',             options: ['Hello', 'Goodbye', 'Thank You', 'Welcome'] },
-  { sign: 'Goodbye',           options: ['Hello', 'Goodbye', 'See you later', 'Take care'] },
-  { sign: 'Good Morning',      options: ['Good Morning', 'Good Night', 'Good afternoon', 'Goodbye'] },
-  { sign: 'Good Night',        options: ['Good Morning', 'Good Night', 'Good afternoon', 'Hello'] },
-  { sign: 'Good afternoon',    options: ['Good Morning', 'Good Night', 'Good afternoon', 'Thank You'] },
-  { sign: 'How are you?',      options: ['How are you?', 'Nice to meet you', 'See you later', 'Take care'] },
-  { sign: 'Nice to meet you',  options: ['How are you?', 'Nice to meet you', 'Welcome', 'Thank You'] },
-  { sign: 'See you later',     options: ['Goodbye', 'See you later', 'Take care', 'Hello'] },
-  { sign: 'Take care',         options: ['Take care', 'Thank You', 'Goodbye', 'Nice to meet you'] },
-  { sign: 'Thank You',         options: ['Welcome', 'Thank You', 'Nice to meet you', 'How are you?'] },
-  { sign: 'Welcome',           options: ['Welcome', 'Thank You', 'Hello', 'Good Morning'] },
-  { sign: 'Happy Birthday',    options: ['Happy Birthday', 'Thank You', 'Welcome', 'Good Morning'] },
+  { sign: 'Hello', options: ['Hello', 'Goodbye', 'Thank You', 'Happy Birthday'] },
+  { sign: 'Goodbye', options: ['Hello', 'Goodbye', 'Thank You', 'Mama'] },
+  { sign: 'Thank You', options: ['Thank You', 'Hello', 'Goodbye', 'Happy Birthday'] },
+  { sign: 'Happy Birthday', options: ['Happy Birthday', 'Thank You', 'Hello', 'Mama'] },
+  { sign: 'Mama', options: ['Mama', 'Hello', 'Thank You', 'Goodbye'] },
+  { sign: 'Yes', options: ['Yes', 'Hello', 'Thank You', 'No'] },
 ].map(({ sign, options }) => ({
   question: 'What greeting is this sign?',
   answer: sign,
@@ -54,19 +48,18 @@ const GREETINGS_QUESTIONS = [
   ...(sign === 'Goodbye' ? { imageUrl: 'asset:greeting_goodbye_1' } : {}),
   ...(sign === 'Thank You' ? { imageUrl: 'asset:greeting_thank_you_1' } : {}),
   ...(sign === 'Happy Birthday' ? { imageUrl: 'asset:greeting_happy_birthday_1' } : {}),
+  ...(sign === 'Mama' ? { imageUrl: 'asset:greeting_mama' } : {}),
+  ...(sign === 'Yes' ? { imageUrl: 'asset:daily_yes' } : {}),
 }));
 
+/** 1–5 use simple raised-finger counts; easier than thumb-touch 6–9 shapes. */
 const NUMBERS_QUESTIONS = [
-  { n: '1',  options: ['1', '2', '3', '4']  },
-  { n: '2',  options: ['1', '2', '3', '4']  },
-  { n: '3',  options: ['2', '3', '4', '5']  },
-  { n: '4',  options: ['3', '4', '5', '6']  },
-  { n: '5',  options: ['4', '5', '6', '7']  },
-  { n: '6',  options: ['5', '6', '7', '8']  },
-  { n: '7',  options: ['6', '7', '8', '9']  },
-  { n: '8',  options: ['7', '8', '9', '10'] },
-  { n: '9',  options: ['6', '8', '9', '10'] },
-  { n: '10', options: ['7', '8', '9', '10'] },
+  { n: '1', options: ['1', '2', '3', '4'] },
+  { n: '2', options: ['1', '2', '3', '5'] },
+  { n: '3', options: ['2', '3', '4', '5'] },
+  { n: '4', options: ['3', '4', '5', '2'] },
+  { n: '5', options: ['4', '5', '3', '1'] },
+  { n: '10', options: ['5', '10', '1', '2'] },
 ].map(({ n, options }) => ({
   question: 'What number is this sign?',
   answer: n,
@@ -75,15 +68,11 @@ const NUMBERS_QUESTIONS = [
 }));
 
 const DAILY_CONVERSATION_QUESTIONS = [
-  { sign: 'Yes',                 options: ['Yes', 'No', 'Please', 'Sure'] },
-  { sign: 'No',                  options: ['Yes', 'No', 'Excuse me', 'Sorry'] },
-  { sign: 'Help',                options: ['Help', 'Please', 'Sorry', 'Excuse me'] },
-  { sign: 'Please',              options: ['Please', 'Sorry', 'Thank You', 'Help'] },
-  { sign: 'Sorry',               options: ['Please', 'Sorry', 'Excuse me', 'Yes'] },
-  { sign: 'Excuse me',           options: ['Excuse me', 'Sorry', 'Please', 'Help'] },
-  { sign: 'My name is',          options: ['My name is', 'What is your name?', 'Friend', 'Help'] },
-  { sign: 'What is your name?',  options: ['My name is', 'What is your name?', 'Friend', 'Sorry'] },
-  { sign: 'Friend',              options: ['Friend', 'My name is', 'Help', 'Sorry'] },
+  { sign: 'Yes', options: ['Yes', 'No', 'Help', 'Thank You'] },
+  { sign: 'No', options: ['Yes', 'No', 'Help', 'Thank You'] },
+  { sign: 'Help', options: ['Help', 'Yes', 'No', 'Thank You'] },
+  { sign: 'Thank You', options: ['Thank You', 'Yes', 'No', 'Help'] },
+  { sign: 'Mama', options: ['Mama', 'Thank You', 'Hello', 'Help'] },
 ].map(({ sign, options }) => ({
   question: 'What sign is this?',
   answer: sign,
@@ -92,47 +81,49 @@ const DAILY_CONVERSATION_QUESTIONS = [
   ...(sign === 'Yes' ? { imageUrl: 'asset:daily_yes' } : {}),
   ...(sign === 'No' ? { imageUrl: 'asset:daily_no_1' } : {}),
   ...(sign === 'Help' ? { imageUrl: 'asset:daily_help' } : {}),
+  ...(sign === 'Thank You' ? { imageUrl: 'asset:greeting_thank_you_1' } : {}),
+  ...(sign === 'Mama' ? { imageUrl: 'asset:greeting_mama' } : {}),
 }));
 
 const DEFAULT_EXAMS = [
   {
     id: 'exam_alphabet',
     title: 'Proficiency Exam 1: Alphabet',
-    description: 'Prove you can recognize the full American Sign Language alphabet. Passing unlocks the next exam.',
+    description: 'Recognize common ASL letters with clear handshapes. Passing unlocks the next exam.',
     category: 'alphabet',
     order: 1,
-    passingScore: 80,
-    timeLimit: 15,
+    passingScore: 75,
+    timeLimit: 12,
     questions: ALPHABET_QUESTIONS,
   },
   {
     id: 'exam_greetings',
     title: 'Proficiency Exam 2: Greetings',
-    description: 'Identify the most common ASL greetings and polite phrases.',
+    description: 'Core greetings and short phrases you can practice with the in-app camera.',
     category: 'greetings',
     order: 2,
-    passingScore: 80,
-    timeLimit: 12,
+    passingScore: 75,
+    timeLimit: 10,
     questions: GREETINGS_QUESTIONS,
   },
   {
     id: 'exam_numbers',
     title: 'Proficiency Exam 3: Numbers',
-    description: 'Recognize signed numbers from 1 to 10.',
+    description: 'Recognize signed numbers 1–5 plus 10 (clear thumb and finger patterns).',
     category: 'numbers',
     order: 3,
-    passingScore: 80,
-    timeLimit: 10,
+    passingScore: 75,
+    timeLimit: 8,
     questions: NUMBERS_QUESTIONS,
   },
   {
     id: 'exam_daily_conversation',
     title: 'Proficiency Exam 4: Daily Conversation',
-    description: 'Identify essential daily-conversation signs used in everyday interactions.',
+    description: 'Essential yes / no / help and thanks—aligned with camera-friendly signs in the app.',
     category: 'daily-conversation',
     order: 4,
-    passingScore: 80,
-    timeLimit: 10,
+    passingScore: 75,
+    timeLimit: 8,
     questions: DAILY_CONVERSATION_QUESTIONS,
   },
 ];

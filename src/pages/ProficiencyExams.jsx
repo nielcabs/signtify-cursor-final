@@ -171,7 +171,7 @@ function ProficiencyExams() {
     <div className="proficiency-page">
       <div className="proficiency-header">
         <h1>Proficiency Exams</h1>
-        <p>Progressive path — pass each exam (usually 80%+) to unlock the next. Retakes stay available after you pass.</p>
+        <p>Progressive path — meet the passing score on each exam card to unlock the next. Retakes stay available after you pass.</p>
       </div>
 
       {loadError && (
@@ -262,7 +262,7 @@ function ProficiencyExams() {
                 <div className="locked-message">
                   <p>{!hasAnyLessonCompleted 
                     ? '🔒 Complete your first lesson to unlock Proficiency Exams'
-                    : '🔒 Complete the previous exam with 80%+ to unlock'}</p>
+                    : '🔒 Pass the previous exam to unlock'}</p>
                   <button disabled className="btn-locked">Locked</button>
                 </div>
               ) : (

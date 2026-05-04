@@ -110,13 +110,13 @@ function Profile() {
   const level = getLevel(totalPoints);
   const progressToNext = getProgressToNextLevel(totalPoints);
   
-  // Count only unique exams that have been passed (80% or higher)
+  // Count only unique exams that have been passed (stored result passed === true)
   // This ensures retakes don't increment the count
   const examsPassed = profile.progress?.examsPassed || [];
   const uniquePassedExams = new Set();
   examsPassed.forEach(exam => {
-    // Only count exams that passed (80% or higher) and have a valid examId
-    if (exam && exam.passed === true && exam.percentage >= 80 && exam.examId) {
+    // Only count exams that passed and have a valid examId
+    if (exam && exam.passed === true && exam.examId) {
       // Normalize examId to handle any case sensitivity or whitespace issues
       const normalizedExamId = String(exam.examId).trim().toLowerCase();
       uniquePassedExams.add(normalizedExamId);
@@ -317,7 +317,12 @@ function Profile() {
             ]
               .sort((a, b) => b.timestamp - a.timestamp)
               .slice(0, 10)
-              .map((activity, index) => (
+              .map((activity, index) => {
+                const activityPassed =
+                  activity.type === 'exam'
+                    ? activity.passed === true
+                    : activity.percentage >= 80;
+                return (
                 <div key={index} className="activity-item">
                   <div className="activity-icon">
                     {activity.type === 'quiz' ? '📝' : '🎓'}
@@ -331,11 +336,12 @@ function Profile() {
                       {new Date(activity.completedAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className={`activity-badge ${activity.percentage >= 80 ? 'pass' : 'fail'}`}>
-                    {activity.percentage >= 80 ? '✓' : '✗'}
+                  <div className={`activity-badge ${activityPassed ? 'pass' : 'fail'}`}>
+                    {activityPassed ? '✓' : '✗'}
                   </div>
                 </div>
-              ))}
+              );
+              })}
           </div>
         ) : (
           <p className="no-activity">No recent activity. Start learning to track your progress!</p>

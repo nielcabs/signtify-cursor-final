@@ -104,7 +104,7 @@ function Home() {
           </div>
           <div className="feature-description">
             <h2>Certify your skills</h2>
-            <p>Take comprehensive proficiency exams to validate your sign language abilities. Pass with 80% or higher and showcase your achievement!</p>
+            <p>Take proficiency exams to validate your sign language abilities. Each exam shows its passing score—meet it to unlock the next and showcase your progress!</p>
             <Link to="/proficiency-exams">
               <button className="feature-cta">VIEW EXAMS →</button>
             </Link>

@@ -198,14 +198,14 @@ export const getUserProfile = async (uid) => {
 };
 
 /**
- * Check if user has passed at least one proficiency exam (80%+).
+ * Check if user has passed at least one proficiency exam (`passed` on the stored result).
  * Used to unlock Dictionary access.
  */
 export const hasPassedAnyProficiencyExam = async (uid) => {
   try {
     const profile = await getUserProfile(uid);
     const examsPassed = profile?.progress?.examsPassed || [];
-    return examsPassed.some(e => e.passed === true && e.percentage >= 80);
+    return examsPassed.some(e => e.passed === true);
   } catch (error) {
     console.error('Error checking passed exams:', error);
     return false;
@@ -220,7 +220,7 @@ export const getPassedExamDictionaryCategories = async (uid) => {
   try {
     const profile = await getUserProfile(uid);
     const examsPassed = profile?.progress?.examsPassed || [];
-    const passed = examsPassed.filter(e => e.passed === true && e.percentage >= 80);
+    const passed = examsPassed.filter(e => e.passed === true);
     const categories = [...new Set(passed.map(e => e.lessonCategory).filter(Boolean))];
     return categories.map(cat => (cat && cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()) || cat);
   } catch (error) {
@@ -416,20 +416,24 @@ export const saveExamResult = async (uid, examId, score, totalQuestions, lessonC
   try {
     const userRef = doc(db, 'users', uid);
     const percentage = Math.round((score / totalQuestions) * 100);
-    const passed = percentage >= 80;
-    
-    // Get exam title for activity log
+
     let examTitle = 'Exam';
+    let passingScore = 80;
     try {
       const examRef = doc(db, 'exams', examId);
       const examDoc = await getDoc(examRef);
       if (examDoc.exists()) {
-        examTitle = examDoc.data().title || examId;
+        const examData = examDoc.data();
+        examTitle = examData.title || examId;
+        if (Number.isFinite(examData.passingScore)) {
+          passingScore = examData.passingScore;
+        }
       }
     } catch (e) {
-      // Use examId if we can't get title
       examTitle = examId;
     }
+
+    const passed = percentage >= passingScore;
     
     // Check if user has already passed this exam before
     const userDoc = await getDoc(userRef);
@@ -442,9 +446,9 @@ export const saveExamResult = async (uid, examId, score, totalQuestions, lessonC
       userEmail = userData.email || '';
       const previousExams = userData.progress?.examsPassed || [];
       
-      // Check if user has already passed this exam (80% or higher)
+      // Already passed if we stored a passing result for this exam id
       hasAlreadyPassed = previousExams.some((exam) =>
-        String(exam.examId) === String(examId) && exam.passed === true && exam.percentage >= 80
+        String(exam.examId) === String(examId) && exam.passed === true
       );
       
       // If user has already passed, don't award points for retake
@@ -490,7 +494,7 @@ export const saveExamResult = async (uid, examId, score, totalQuestions, lessonC
       });
 
       // Check if user should complete the lesson based on exam score (only on first pass)
-      if (percentage >= 80 && !hasAlreadyPassed) {
+      if (passed && !hasAlreadyPassed) {
         await checkAndCompleteLesson(uid, lessonCategory, 'exam', examId, percentage);
       }
     } else {
@@ -507,7 +511,7 @@ export const saveExamResult = async (uid, examId, score, totalQuestions, lessonC
       title: passed ? `🎓 Exam passed: ${examTitle}` : `Exam result: ${examTitle}`,
       message: passed
         ? `You scored ${percentage}%. ${hasAlreadyPassed ? 'Nice retake!' : 'Congratulations!'}`
-        : `You scored ${percentage}%. 80% is required to pass — try again when you're ready.`,
+        : `You scored ${percentage}%. ${passingScore}% is required to pass — try again when you're ready.`,
       link: '/proficiency-exams',
     });
 
@@ -657,14 +661,14 @@ export const checkAndCompleteLesson = async (uid, lessonCategory, assessmentType
       quiz.lessonCategory === lessonCategory
     );
     
-    // Check if exam has been passed (80%+)
-    const hasPassedExam = examsPassed.some(exam => 
-      exam.lessonCategory === lessonCategory && exam.percentage >= 80
+    // Check if exam has been passed for this category (stored `passed` flag)
+    const hasPassedExam = examsPassed.some(exam =>
+      exam.lessonCategory === lessonCategory && exam.passed === true
     );
 
     console.log(`Checking lesson completion for ${lessonCategory}:`);
     console.log(`- Has taken quiz: ${hasTakenQuiz}`);
-    console.log(`- Has passed exam (80%+): ${hasPassedExam}`);
+    console.log(`- Has passed exam: ${hasPassedExam}`);
     console.log(`- Quiz results:`, quizzesCompleted.filter(q => q.lessonCategory === lessonCategory));
     console.log(`- Exam results:`, examsPassed.filter(e => e.lessonCategory === lessonCategory));
 
@@ -704,7 +708,7 @@ export const checkAndCompleteLesson = async (uid, lessonCategory, assessmentType
       }
 
       if (hasPassedExam) {
-        console.log(`Lesson ${lessonId} (${lessonCategory}) completed! Quiz taken and exam passed with 80%+`);
+        console.log(`Lesson ${lessonId} (${lessonCategory}) completed! Quiz taken and proficiency exam passed.`);
       } else {
         console.log(`Lesson ${lessonId} (${lessonCategory}) completed! Quiz taken.`);
       }

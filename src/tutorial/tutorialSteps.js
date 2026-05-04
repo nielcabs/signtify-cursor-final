@@ -43,7 +43,7 @@ export const tutorialSteps = {
       id: 'proficiency-exams',
       target: '.nav-menu .nav-item:nth-child(3)',
       title: 'Prove Your Skills',
-      content: 'Pass proficiency exams with 80% or higher to unlock the Dictionary and advanced features. Find them under "Proficiency Exam" in the navigation. Exams unlock sequentially!',
+      content: 'Pass proficiency exams with 75% or higher to unlock the Dictionary and advanced features. Find them under "Proficiency Exam" in the navigation. Exams unlock sequentially!',
       position: 'bottom',
       fallbackTarget: '.nav-item'
     },
@@ -212,7 +212,7 @@ export const tutorialSteps = {
       id: 'exam-intro',
       target: null,
       title: 'Proficiency Exam',
-      content: 'Prove your mastery! Pass with 80% or higher to unlock the Dictionary and advanced features.',
+      content: 'Prove your mastery! Pass with 75% or higher to unlock the Dictionary and advanced features.',
       position: 'center',
       showPrev: false
     },
@@ -228,7 +228,7 @@ export const tutorialSteps = {
       id: 'exam-questions',
       target: '.exam-question',
       title: 'Exam Format',
-      content: 'Exams are comprehensive tests covering all lesson material. You need 80% to pass and unlock the next level.',
+      content: 'Exams are comprehensive tests covering all lesson material. You need 75% to pass and unlock the next level.',
       position: 'center',
       fallbackTarget: '.exam-container'
     },
