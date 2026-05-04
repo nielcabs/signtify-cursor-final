@@ -110,28 +110,6 @@ const inferCameraExpectedSign = (question, category) => {
   return directAnswer;
 };
 
-/**
- * ILY uses word-mode detection. Alphabet-category exams that include an ILY trivia row must not use letter-only mode.
- */
-const resolveCameraDetectionCategory = (question, examCategory) => {
-  const cat = normalizeText(examCategory || '');
-  if (cat !== 'alphabet') return examCategory;
-  const cam = inferCameraExpectedSign(question, examCategory);
-  const exp = normalizeText(cam);
-  const qt = normalizeText(String(question?.question || ''));
-  const opts = Array.isArray(question?.options) ? question.options : [];
-  const hasIlyOption = opts.some((o) => /i\s*love\s*you/i.test(String(o)));
-  if (
-    exp.includes('i love you') ||
-    /i\s*,\s*l\s*,\s*y/.test(exp) ||
-    /i\s*,\s*l\s*,\s*y/.test(qt) ||
-    (/converted to/.test(qt) && (hasIlyOption || exp.includes('i love you')))
-  ) {
-    return 'daily-conversation';
-  }
-  return examCategory;
-};
-
 function Exam() {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -502,7 +480,6 @@ function Exam() {
   // ---- Active exam screen ----
   const question = attempt[currentIndex];
   const cameraExpectedSign = inferCameraExpectedSign(question, exam.category);
-  const cameraDetectionCategory = resolveCameraDetectionCategory(question, exam.category);
   const answeredCount = answers.filter((a) => a !== null).length;
   const timerDanger = timeRemaining !== null && timeRemaining <= 60;
 
@@ -567,7 +544,6 @@ function Exam() {
         <ExamCameraVerifier
           expectedSign={cameraExpectedSign}
           questionText={question.question}
-          category={cameraDetectionCategory}
           onCorrectDetected={handleCameraCorrect}
           disabled={showResult}
         />

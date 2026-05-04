@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as fp from 'fingerpose';
 import Handsigns from '../../handsign-tensorflow-master/components/handsigns/index.js';
 import { getFoldedHandScore, getLocalLetterHeuristic } from '../utils/liveLetterHeuristics.js';
+import { inferLocalDetectionMode } from '../utils/inferLocalDetectionMode.js';
 import { useToast } from './ui/Toast';
 
 const SEQUENCE_LENGTH = 30;
@@ -30,17 +31,9 @@ function mirrorHandLandmarks(hand) {
 
 const normalize = (value) => String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
-const modeFromCategory = (category) => {
-  const c = normalize(category);
-  if (c === 'alphabet') return 'letters';
-  if (c === 'numbers') return 'numbers';
-  return 'words';
-};
-
 function ExamCameraVerifier({
   expectedSign,
   questionText = '',
-  category,
   onCorrectDetected,
   disabled = false
 }) {
@@ -69,20 +62,11 @@ function ExamCameraVerifier({
   const [detectionStatus, setDetectionStatus] = useState('Camera ready');
   const [detectedSign, setDetectedSign] = useState('');
   const [confidence, setConfidence] = useState(0);
-  const mode = useMemo(() => {
-    const base = modeFromCategory(category);
-    const exp = normalize(String(expectedSign || ''));
-    const qt = normalize(String(questionText || ''));
-    if (base === 'letters' && (
-      exp.includes('i love you') ||
-      /i\s*,\s*l\s*,\s*y/.test(exp) ||
-      /i\s*,\s*l\s*,\s*y/.test(qt) ||
-      (/converted to/.test(qt) && /i\s*love\s*you|ily/i.test(exp + ' ' + qt))
-    )) {
-      return 'words';
-    }
-    return base;
-  }, [category, expectedSign, questionText]);
+  /** Letters / numbers / words pipelines — driven by expected sign, not exam category. */
+  const mode = useMemo(
+    () => inferLocalDetectionMode(expectedSign, questionText),
+    [expectedSign, questionText]
+  );
 
   const normalizePrediction = useCallback((value) => {
     const v = normalize(value);
