@@ -283,7 +283,7 @@ function ProficiencyExams() {
               )}
               {playableQuestions.length === 0 && (
                 <div className="exam-no-questions-hint">
-                  No playable questions yet (each needs an answer and at least two options). Edit this exam in Teacher Dashboard → Exams.
+                  No playable questions yet (each needs a correct answer label listed under sign labels). Edit this exam in Teacher Dashboard → Exams.
                 </div>
               )}
 

@@ -1,6 +1,6 @@
 /**
  * Firestore may return `questions` as a true array or (in edge cases) a map-like object.
- * Exams are only playable when each row has an answer and at least two options.
+ * Camera exams need a correct answer label; optional extra "options" are stored but do not change scoring.
  */
 export function normalizeExamQuestions(raw) {
   if (raw == null) return [];
@@ -16,6 +16,12 @@ export function normalizeExamQuestions(raw) {
   return [];
 }
 
+const normLabel = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+
 export function isValidExamQuestion(q) {
   if (!q || typeof q !== 'object') return false;
   const ans = String(q.answer ?? '').trim();
@@ -23,8 +29,9 @@ export function isValidExamQuestion(q) {
   const opts = Array.isArray(q.options)
     ? q.options.map((o) => String(o).trim()).filter(Boolean)
     : [];
-  if (opts.length < 2) return false;
-  return true;
+  if (opts.length < 1) return false;
+  const nAns = normLabel(ans);
+  return opts.some((o) => normLabel(o) === nAns);
 }
 
 export function getValidExamQuestions(raw) {

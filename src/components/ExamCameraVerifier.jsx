@@ -40,7 +40,6 @@ const modeFromCategory = (category) => {
 function ExamCameraVerifier({
   expectedSign,
   questionText = '',
-  candidateOptions = [],
   category,
   onCorrectDetected,
   disabled = false
@@ -103,7 +102,7 @@ function ExamCameraVerifier({
     const match = String(questionText || '').match(/for\s+(.+?)\??$/i);
     if (match?.[1]) add(match[1]);
 
-    (Array.isArray(candidateOptions) ? candidateOptions : []).forEach(add);
+    /** Only the expected sign (+ question cues / synonyms below)—not MC “options”. Wrong labels must not count as correct. */
 
     const qt = String(questionText || '').toLowerCase();
     if (qt.includes('i love you') || qt.includes('i, l, y') || qt.includes("'i, l, y'") || qt.includes('"i, l, y"')) {
@@ -115,7 +114,7 @@ function ExamCameraVerifier({
       add('ilu');
     }
     return aliases;
-  }, [candidateOptions, expectedSign, normalizePrediction, questionText]);
+  }, [expectedSign, normalizePrediction, questionText]);
 
   useEffect(() => {
     expectedRef.current = normalize(expectedSign);

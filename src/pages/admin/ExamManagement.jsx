@@ -109,8 +109,8 @@ function ExamManagement() {
     }
 
     const validOptions = currentQuestion.options.filter(opt => opt.trim() !== '');
-    if (validOptions.length < 2) {
-      toast.warning('Please provide at least 2 options');
+    if (validOptions.length < 1) {
+      toast.warning('Enter at least one sign label (the correct sign must appear in that list)');
       return;
     }
 
@@ -386,9 +386,8 @@ function ExamManagement() {
                 <div className="exam-camera-hint" role="note">
                   <strong>Camera-based exam</strong>
                   <p>
-                    Students never tap multiple-choice buttons. They use the webcam to perform the sign.
-                    The fields below define the <em>text prompt</em>, optional reference image, and the <strong>sign labels</strong>{' '}
-                    the app uses to score the camera (one correct label plus a few wrong labels to reduce confusion).
+                    Students perform the sign on camera. Only the <strong>correct sign label</strong> you choose below is used for scoring.
+                    Extra labels are optional (e.g. similar signs you want recorded beside the question)—they are not shown as buttons and do not substitute for the correct answer.
                   </p>
                 </div>
                 <div className="form-group">
@@ -436,9 +435,9 @@ function ExamManagement() {
                 )}
 
                 <div className="form-group">
-                  <label>Sign labels (correct answer + distractors)</label>
+                  <label>Sign labels</label>
                   <p className="field-hint-text">
-                    Enter at least two labels. These are not on-screen buttons—learners sign the correct one on camera.
+                    Minimum: include the correct sign as one label (you can add more for reference). Grading uses only the dropdown choice, not the extra labels.
                   </p>
                   {currentQuestion.options.map((option, index) => (
                     <div key={index} className="sign-label-row">

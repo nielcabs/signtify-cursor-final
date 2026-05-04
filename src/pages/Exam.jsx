@@ -385,8 +385,8 @@ function Exam() {
         <div className="error-container card">
           <h2>⚠️ No Questions Available</h2>
           <p>
-            This exam has no playable questions yet. Each question needs a correct answer and at least two
-            options. Ask a teacher to open <strong>Teacher Dashboard → Exams</strong> and edit this exam.
+            This exam has no playable questions yet. Each question needs a correct sign label listed in its sign labels.
+            Ask a teacher to open <strong>Teacher Dashboard → Exams</strong> and edit this exam.
           </p>
           <button onClick={() => navigate('/proficiency-exams')}>Return to Exams</button>
         </div>
@@ -567,7 +567,6 @@ function Exam() {
         <ExamCameraVerifier
           expectedSign={cameraExpectedSign}
           questionText={question.question}
-          candidateOptions={question.options}
           category={cameraDetectionCategory}
           onCorrectDetected={handleCameraCorrect}
           disabled={showResult}
