@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from './ui/Toast';
 
 const FLASK_SERVER_URL = (import.meta.env.VITE_FLASK_PREDICT_URL || 'http://127.0.0.1:5000/predict').trim();
-const BACKEND_TIMEOUT_MS = 5000;
+const BACKEND_TIMEOUT_MS = 12000;
 const SEQUENCE_LENGTH = 30;
 
 const normalize = (value) => String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
@@ -13,6 +13,8 @@ const modeFromCategory = (category) => {
   if (c === 'numbers') return 'numbers';
   return 'words';
 };
+
+const isLocalPredictUrl = (url) => /127\.0\.0\.1|localhost/i.test(String(url || ''));
 
 function ExamCameraVerifier({
   expectedSign,
@@ -28,6 +30,7 @@ function ExamCameraVerifier({
   const predictionIntervalRef = useRef(null);
   const frameSendInFlightRef = useRef(false);
   const sequenceRef = useRef([]);
+  const primaryHandRef = useRef(null);
   const scriptsLoadedRef = useRef(false);
   const correctLockRef = useRef(false);
   const detectedRef = useRef('');
@@ -38,6 +41,7 @@ function ExamCameraVerifier({
   const [detectionStatus, setDetectionStatus] = useState('Camera ready');
   const [detectedSign, setDetectedSign] = useState('');
   const [confidence, setConfidence] = useState(0);
+  const [consecutiveTimeouts, setConsecutiveTimeouts] = useState(0);
 
   const mode = useMemo(() => modeFromCategory(category), [category]);
 
@@ -61,6 +65,100 @@ function ExamCameraVerifier({
     if (v === 'thanks' || v === 'thank_you' || v === 'ty') return 'thank you';
     return v;
   }, []);
+
+  const dist2D = (a, b) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0));
+
+  const getLocalNumberPrediction = useCallback((hand) => {
+    if (!hand || hand.length < 21) return null;
+    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
+    const indexUp = isUp(8, 6);
+    const middleUp = isUp(12, 10);
+    const ringUp = isUp(16, 14);
+    const pinkyUp = isUp(20, 18);
+    const thumbSpread = Math.abs(hand[4][0] - hand[2][0]);
+    const thumbRaised = hand[4][1] < (hand[3][1] - 0.015);
+    const thumbOpen = thumbSpread > 0.08 || thumbRaised;
+    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
+    const thumbTouches = (tipIdx, ratio = 0.40) => dist2D(hand[4], hand[tipIdx]) <= (palmWidth * ratio);
+
+    if (indexUp && middleUp && ringUp && thumbTouches(20, 0.42)) return { sign: '6', confidence: 0.84 };
+    if (indexUp && middleUp && pinkyUp && thumbTouches(16, 0.40)) return { sign: '7', confidence: 0.84 };
+    if (indexUp && ringUp && pinkyUp && thumbTouches(12, 0.38)) return { sign: '8', confidence: 0.84 };
+    if (middleUp && ringUp && pinkyUp && thumbTouches(8, 0.36)) return { sign: '9', confidence: 0.84 };
+    if (thumbRaised && !indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: '10', confidence: 0.80 };
+    if (!indexUp && !middleUp && !ringUp && !pinkyUp && thumbTouches(8, 0.36) && thumbTouches(12, 0.38)) return { sign: '0', confidence: 0.72 };
+    if (indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: '1', confidence: 0.78 };
+    if (indexUp && middleUp && !ringUp && !pinkyUp) return { sign: '2', confidence: 0.80 };
+    if (indexUp && middleUp && ringUp && !pinkyUp) return { sign: '3', confidence: 0.80 };
+    if (indexUp && middleUp && ringUp && pinkyUp && thumbOpen) return { sign: '5', confidence: 0.82 };
+    if (indexUp && middleUp && ringUp && pinkyUp) return { sign: '4', confidence: 0.80 };
+    return null;
+  }, []);
+
+  const getLocalLetterPrediction = useCallback((hand) => {
+    if (!hand || hand.length < 21) return null;
+    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
+    const indexUp = isUp(8, 6);
+    const middleUp = isUp(12, 10);
+    const ringUp = isUp(16, 14);
+    const pinkyUp = isUp(20, 18);
+    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08;
+    const palmWidth = dist2D(hand[5], hand[17]) + 1e-6;
+    const indexMiddleDist = dist2D(hand[8], hand[12]);
+    const thumbIndexDist = dist2D(hand[4], hand[8]);
+
+    if (thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: 'a', confidence: 0.62 };
+    if (!thumbOpen && indexUp && middleUp && ringUp && pinkyUp) return { sign: 'b', confidence: 0.64 };
+    if (thumbOpen && indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: 'l', confidence: 0.66 };
+    if (!thumbOpen && !indexUp && !middleUp && !ringUp && !pinkyUp && thumbIndexDist < palmWidth * 0.18) return { sign: 'o', confidence: 0.57 };
+    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist < (palmWidth * 0.26)) return { sign: 'u', confidence: 0.63 };
+    if (!thumbOpen && indexUp && middleUp && !ringUp && !pinkyUp && indexMiddleDist >= (palmWidth * 0.26)) return { sign: 'v', confidence: 0.63 };
+    if (thumbOpen && !indexUp && !middleUp && !ringUp && pinkyUp) return { sign: 'y', confidence: 0.64 };
+    if (indexUp && !middleUp && !ringUp && !pinkyUp) return { sign: 'd', confidence: 0.56 };
+    return null;
+  }, []);
+
+  const getLocalWordPrediction = useCallback((hand) => {
+    if (!hand || hand.length < 21) return null;
+    const isUp = (tip, pip, margin = 0.02) => hand[tip][1] < (hand[pip][1] - margin);
+    const indexUp = isUp(8, 6);
+    const middleUp = isUp(12, 10);
+    const ringUp = isUp(16, 14);
+    const pinkyUp = isUp(20, 18);
+    const thumbOpen = Math.abs(hand[4][0] - hand[2][0]) > 0.08 || hand[4][1] < (hand[3][1] - 0.015);
+    const allOpen = indexUp && middleUp && ringUp && pinkyUp;
+    const fistLike = !indexUp && !middleUp && !ringUp && !pinkyUp;
+
+    if (allOpen) return { sign: 'thank you', confidence: 0.58 };
+    if (fistLike && thumbOpen) return { sign: 'yes', confidence: 0.60 };
+    return null;
+  }, []);
+
+  const applyDetected = useCallback((sign, conf, status = 'Sign detected') => {
+    const predicted = normalizePrediction(sign);
+    if (!isAllowedForMode(predicted)) return false;
+    setDetectedSign(predicted);
+    detectedRef.current = predicted;
+    setConfidence(Math.round(conf * 100));
+    setDetectionStatus(status);
+    if (!correctLockRef.current && predicted === expectedRef.current) {
+      correctLockRef.current = true;
+      setDetectionStatus('Correct sign! Moving to next question...');
+      onCorrectDetected?.(predicted, conf);
+    }
+    return true;
+  }, [isAllowedForMode, normalizePrediction, onCorrectDetected]);
+
+  const tryLocalFallback = useCallback(() => {
+    const hand = primaryHandRef.current;
+    let local = null;
+    if (mode === 'numbers') local = getLocalNumberPrediction(hand);
+    else if (mode === 'letters') local = getLocalLetterPrediction(hand);
+    else local = getLocalWordPrediction(hand);
+
+    if (!local) return false;
+    return applyDetected(local.sign, local.confidence, 'Detected (local)');
+  }, [applyDetected, getLocalLetterPrediction, getLocalNumberPrediction, getLocalWordPrediction, mode]);
 
   const loadMediaPipeScripts = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -136,6 +234,10 @@ function ExamCameraVerifier({
 
   const runPrediction = useCallback(async () => {
     if (frameSendInFlightRef.current) return;
+    if (tryLocalFallback()) {
+      setConsecutiveTimeouts(0);
+      return;
+    }
     if (sequenceRef.current.length < SEQUENCE_LENGTH) {
       setDetectionStatus(`Collecting frames ${sequenceRef.current.length}/${SEQUENCE_LENGTH}`);
       return;
@@ -156,34 +258,46 @@ function ExamCameraVerifier({
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
       const data = await response.json();
+      setConsecutiveTimeouts(0);
       const predicted = normalizePrediction(data?.prediction);
       const conf = Number(data?.confidence || 0);
 
       if (!isAllowedForMode(predicted) || conf < 0.5 || predicted === 'nothing') {
-        setDetectionStatus('Show the sign clearly to the camera');
+        if (!tryLocalFallback()) {
+          setDetectionStatus('Show the sign clearly to the camera');
+        }
         return;
       }
-
-      setDetectedSign(predicted);
-      detectedRef.current = predicted;
-      setConfidence(Math.round(conf * 100));
-      setDetectionStatus('Sign detected');
-
-      if (!correctLockRef.current && predicted === expectedRef.current) {
-        correctLockRef.current = true;
-        setDetectionStatus('Correct sign! Moving to next question...');
-        onCorrectDetected?.(predicted, conf);
-      }
+      applyDetected(predicted, conf);
     } catch (error) {
       const isAbort = error?.name === 'AbortError';
-      setDetectionStatus(isAbort ? 'Backend slow, retrying...' : 'Detection unavailable');
+      if (isAbort) {
+        setConsecutiveTimeouts((prev) => prev + 1);
+        if (!tryLocalFallback()) {
+          setDetectionStatus('Backend slow, retrying...');
+        }
+      } else {
+        if (!tryLocalFallback()) {
+          setDetectionStatus('Detection unavailable');
+        }
+      }
     } finally {
       frameSendInFlightRef.current = false;
     }
-  }, [isAllowedForMode, mode, normalizePrediction, onCorrectDetected]);
+  }, [applyDetected, isAllowedForMode, mode, normalizePrediction, tryLocalFallback]);
 
   const startCamera = useCallback(async () => {
     try {
+      const host = window?.location?.hostname || '';
+      const isProductionHost = host && host !== 'localhost' && host !== '127.0.0.1';
+      if (isProductionHost && isLocalPredictUrl(FLASK_SERVER_URL)) {
+        setCameraError(
+          'Prediction backend is misconfigured. Set VITE_FLASK_PREDICT_URL in Vercel to your Render /predict endpoint.'
+        );
+        toast.error('Backend URL is set to localhost in production.');
+        return;
+      }
+
       setCameraError(null);
       setDetectionStatus('Initializing camera...');
       await loadMediaPipeScripts();
@@ -227,6 +341,10 @@ function ExamCameraVerifier({
 
         const keypoints = extractKeypoints(handResults);
         sequenceRef.current = [...sequenceRef.current, keypoints].slice(-SEQUENCE_LENGTH);
+        const candidateHands = [handResults.rightHandLandmarks, handResults.leftHandLandmarks]
+          .filter(Boolean)
+          .map((hand) => hand.map((point) => [point.x, point.y, point.z]));
+        primaryHandRef.current = candidateHands[0] || null;
       });
 
       cameraRef.current = new window.Camera(videoRef.current, {
@@ -262,6 +380,14 @@ function ExamCameraVerifier({
       stopCamera();
     }
   }, [disabled, isCameraActive, stopCamera]);
+
+  useEffect(() => {
+    if (consecutiveTimeouts >= 3) {
+      setCameraError(
+        'Prediction server is slow or sleeping. If this is Vercel, confirm VITE_FLASK_PREDICT_URL points to your Render /predict URL.'
+      );
+    }
+  }, [consecutiveTimeouts]);
 
   return (
     <div className="exam-camera-verifier">
