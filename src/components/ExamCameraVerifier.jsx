@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from './ui/Toast';
 
-const FLASK_SERVER_URL = (import.meta.env.VITE_FLASK_PREDICT_URL || 'http://127.0.0.1:5000/predict').trim();
-const BACKEND_TIMEOUT_MS = 12000;
 const SEQUENCE_LENGTH = 30;
 const LOCAL_WORD_VOTE_WINDOW = 6;
 const LOCAL_WORD_MIN_VOTES = 2;
 const LOCAL_WORD_VOTE_MAX_AGE_MS = 1600;
+const LOCAL_LETTER_VOTE_WINDOW = 5;
+const LOCAL_LETTER_MIN_VOTES = 2;
+const LOCAL_LETTER_VOTE_MAX_AGE_MS = 1200;
+const LOCAL_NUMBER_VOTE_WINDOW = 5;
+const LOCAL_NUMBER_MIN_VOTES = 2;
+const LOCAL_NUMBER_VOTE_MAX_AGE_MS = 1200;
 
 const normalize = (value) => String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
@@ -16,8 +20,6 @@ const modeFromCategory = (category) => {
   if (c === 'numbers') return 'numbers';
   return 'words';
 };
-
-const isLocalPredictUrl = (url) => /127\.0\.0\.1|localhost/i.test(String(url || ''));
 
 function ExamCameraVerifier({
   expectedSign,
@@ -37,6 +39,8 @@ function ExamCameraVerifier({
   const sequenceRef = useRef([]);
   const primaryHandRef = useRef(null);
   const localWordVoteQueueRef = useRef([]);
+  const localLetterVoteQueueRef = useRef([]);
+  const localNumberVoteQueueRef = useRef([]);
   const scriptsLoadedRef = useRef(false);
   const correctLockRef = useRef(false);
   const detectedRef = useRef('');
@@ -47,8 +51,6 @@ function ExamCameraVerifier({
   const [detectionStatus, setDetectionStatus] = useState('Camera ready');
   const [detectedSign, setDetectedSign] = useState('');
   const [confidence, setConfidence] = useState(0);
-  const [consecutiveTimeouts, setConsecutiveTimeouts] = useState(0);
-
   const mode = useMemo(() => modeFromCategory(category), [category]);
 
   const normalizePrediction = useCallback((value) => {
@@ -76,7 +78,8 @@ function ExamCameraVerifier({
     expectedRef.current = normalize(expectedSign);
     correctLockRef.current = false;
     localWordVoteQueueRef.current = [];
-    setConsecutiveTimeouts(0);
+    localLetterVoteQueueRef.current = [];
+    localNumberVoteQueueRef.current = [];
     setCameraError(null);
     setDetectedSign('');
     setConfidence(0);
@@ -273,20 +276,75 @@ function ExamCameraVerifier({
     return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
   }, [applyDetected, expectedAliases, getLocalWordHeuristicExam, isAllowedForMode, normalizePrediction]);
 
-  const tryLocalFallback = useCallback(() => {
+  const tryExamLocalLetterVoted = useCallback(() => {
     const hand = primaryHandRef.current;
-    if (mode === 'numbers') {
-      const local = getLocalNumberPrediction(hand);
-      if (!local) return false;
-      return applyDetected(local.sign, local.confidence, 'Detected (local)');
+    const local = getLocalLetterPrediction(hand);
+    if (!local) return false;
+    const sign = normalize(String(local.sign));
+    if (!isAllowedForMode(sign)) return false;
+    if (!(sign === expectedRef.current || expectedAliases.has(sign))) {
+      setDetectionStatus(`Hold steady — need letter "${expectedRef.current.toUpperCase()}"`);
+      return false;
     }
-    if (mode === 'letters') {
-      const local = getLocalLetterPrediction(hand);
-      if (!local) return false;
-      return applyDetected(local.sign, local.confidence, 'Detected (local)');
+    const now = Date.now();
+    const queue = [...localLetterVoteQueueRef.current, { sign, confidence: local.confidence, at: now }]
+      .filter((item) => now - item.at <= LOCAL_LETTER_VOTE_MAX_AGE_MS)
+      .slice(-LOCAL_LETTER_VOTE_WINDOW);
+    localLetterVoteQueueRef.current = queue;
+    const grouped = queue.reduce((acc, item) => {
+      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+      acc[item.sign].count += 1;
+      acc[item.sign].confSum += item.confidence;
+      return acc;
+    }, {});
+    const ranked = Object.entries(grouped)
+      .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
+      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+    const best = ranked[0];
+    if (!best || best.count < LOCAL_LETTER_MIN_VOTES) {
+      setDetectionStatus(`Stabilizing letter… (${best?.count || 1}/${LOCAL_LETTER_MIN_VOTES})`);
+      return false;
     }
+    return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
+  }, [applyDetected, expectedAliases, getLocalLetterPrediction, isAllowedForMode]);
+
+  const tryExamLocalNumberVoted = useCallback(() => {
+    const hand = primaryHandRef.current;
+    const local = getLocalNumberPrediction(hand);
+    if (!local) return false;
+    const sign = normalize(String(local.sign));
+    if (!isAllowedForMode(sign)) return false;
+    if (!(sign === expectedRef.current || expectedAliases.has(sign))) {
+      setDetectionStatus(`Hold steady — need "${expectedRef.current}"`);
+      return false;
+    }
+    const now = Date.now();
+    const queue = [...localNumberVoteQueueRef.current, { sign, confidence: local.confidence, at: now }]
+      .filter((item) => now - item.at <= LOCAL_NUMBER_VOTE_MAX_AGE_MS)
+      .slice(-LOCAL_NUMBER_VOTE_WINDOW);
+    localNumberVoteQueueRef.current = queue;
+    const grouped = queue.reduce((acc, item) => {
+      if (!acc[item.sign]) acc[item.sign] = { count: 0, confSum: 0 };
+      acc[item.sign].count += 1;
+      acc[item.sign].confSum += item.confidence;
+      return acc;
+    }, {});
+    const ranked = Object.entries(grouped)
+      .map(([k, stats]) => ({ sign: k, count: stats.count, avgConfidence: stats.confSum / stats.count }))
+      .sort((a, b) => (b.count - a.count) || (b.avgConfidence - a.avgConfidence));
+    const best = ranked[0];
+    if (!best || best.count < LOCAL_NUMBER_MIN_VOTES) {
+      setDetectionStatus(`Stabilizing number… (${best?.count || 1}/${LOCAL_NUMBER_MIN_VOTES})`);
+      return false;
+    }
+    return applyDetected(best.sign, best.avgConfidence, 'Detected (local)');
+  }, [applyDetected, expectedAliases, getLocalNumberPrediction, isAllowedForMode]);
+
+  const tryLocalFallback = useCallback(() => {
+    if (mode === 'numbers') return tryExamLocalNumberVoted();
+    if (mode === 'letters') return tryExamLocalLetterVoted();
     return tryExamLocalWordVoted();
-  }, [applyDetected, getLocalLetterPrediction, getLocalNumberPrediction, mode, tryExamLocalWordVoted]);
+  }, [mode, tryExamLocalLetterVoted, tryExamLocalNumberVoted, tryExamLocalWordVoted]);
 
   const loadMediaPipeScripts = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -358,86 +416,33 @@ function ExamCameraVerifier({
     setDetectionStatus('Camera stopped');
     sequenceRef.current = [];
     localWordVoteQueueRef.current = [];
+    localLetterVoteQueueRef.current = [];
+    localNumberVoteQueueRef.current = [];
     frameSendInFlightRef.current = false;
   }, []);
 
   const runPrediction = useCallback(async () => {
     if (frameSendInFlightRef.current) return;
     if (tryLocalFallback()) {
-      setConsecutiveTimeouts(0);
       return;
     }
-    // Words mode matches Live Translate: local heuristics + voting only (no Render cold starts).
+    // All exam modes use local palm heuristics + voting (same idea as Live Translate). No Render /predict.
+    const minFrames = mode === 'words' ? 8 : 2;
+    if (sequenceRef.current.length < minFrames) {
+      setDetectionStatus(`Collecting frames ${sequenceRef.current.length}/${minFrames}`);
+      return;
+    }
     if (mode === 'words') {
-      setConsecutiveTimeouts(0);
-      if (sequenceRef.current.length < 8) {
-        setDetectionStatus(`Collecting motion ${sequenceRef.current.length}/8`);
-      } else {
-        setDetectionStatus('Local detection — wave or move clearly if stuck');
-      }
-      return;
+      setDetectionStatus('Local detection — wave or move clearly if stuck');
+    } else if (mode === 'letters') {
+      setDetectionStatus('Local detection — hold the letter shape steady');
+    } else {
+      setDetectionStatus('Local detection — hold the number shape steady');
     }
-    if (sequenceRef.current.length < SEQUENCE_LENGTH) {
-      setDetectionStatus(`Collecting frames ${sequenceRef.current.length}/${SEQUENCE_LENGTH}`);
-      return;
-    }
-
-    frameSendInFlightRef.current = true;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
-
-      const response = await fetch(FLASK_SERVER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sequence: sequenceRef.current, mode }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
-
-      const data = await response.json();
-      setConsecutiveTimeouts(0);
-      const predicted = normalizePrediction(data?.prediction);
-      const conf = Number(data?.confidence || 0);
-
-      if (!isAllowedForMode(predicted) || conf < 0.5 || predicted === 'nothing') {
-        if (!tryLocalFallback()) {
-          setDetectionStatus('Show the sign clearly to the camera');
-        }
-        return;
-      }
-      applyDetected(predicted, conf);
-    } catch (error) {
-      const isAbort = error?.name === 'AbortError';
-      if (isAbort) {
-        setConsecutiveTimeouts((prev) => prev + 1);
-        if (!tryLocalFallback()) {
-          setDetectionStatus('Backend slow, retrying...');
-        }
-      } else {
-        if (!tryLocalFallback()) {
-          setDetectionStatus('Detection unavailable');
-        }
-      }
-    } finally {
-      frameSendInFlightRef.current = false;
-    }
-  }, [applyDetected, isAllowedForMode, mode, normalizePrediction, tryLocalFallback]);
+  }, [mode, tryLocalFallback]);
 
   const startCamera = useCallback(async () => {
     try {
-      const host = window?.location?.hostname || '';
-      const isProductionHost = host && host !== 'localhost' && host !== '127.0.0.1';
-      const examMode = modeFromCategory(category);
-      if (isProductionHost && isLocalPredictUrl(FLASK_SERVER_URL) && examMode !== 'words') {
-        setCameraError(
-          'Prediction backend is misconfigured. Set VITE_FLASK_PREDICT_URL in Vercel to your Render /predict endpoint.'
-        );
-        toast.error('Backend URL is set to localhost in production.');
-        return;
-      }
-
       setCameraError(null);
       setDetectionStatus('Initializing camera...');
       await loadMediaPipeScripts();
@@ -520,14 +525,6 @@ function ExamCameraVerifier({
       stopCamera();
     }
   }, [disabled, isCameraActive, stopCamera]);
-
-  useEffect(() => {
-    if (consecutiveTimeouts >= 3) {
-      setCameraError(
-        'Prediction server is slow or sleeping. If this is Vercel, confirm VITE_FLASK_PREDICT_URL points to your Render /predict URL.'
-      );
-    }
-  }, [consecutiveTimeouts]);
 
   return (
     <div className="exam-camera-verifier">

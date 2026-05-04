@@ -62,6 +62,15 @@ const inferCameraExpectedSign = (question, category) => {
     return optionMatch || extracted;
   }
 
+  if (mode === 'letters') {
+    const aslQuoted = questionText.match(/\basl\s*['`]([a-z])['`]/i);
+    if (aslQuoted?.[1]) {
+      const ch = aslQuoted[1].toUpperCase();
+      const optionMatch = options.find((opt) => normalizeText(opt) === normalizeText(ch));
+      return optionMatch || ch;
+    }
+  }
+
   const optionFromQuestion = options.find((opt) => questionText.toLowerCase().includes(String(opt).toLowerCase()));
   if (optionFromQuestion) return optionFromQuestion;
 
