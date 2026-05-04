@@ -401,6 +401,44 @@
   font-size: 1.05rem;
 }
 
+.exam-sample-question {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  background: #f3f4f6;
+  border-radius: 8px;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+}
+
+.exam-sample-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+
+.exam-sample-question p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #374151;
+}
+
+.exam-no-questions-hint {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #9a3412;
+  line-height: 1.4;
+  text-align: left;
+}
+
 .exam-stats {
   background: #F7F7F7;
   padding: 1.5rem;

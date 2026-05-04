@@ -4,7 +4,15 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { getUserProfile } from '../auth/firestoreUtils';
+import { getValidExamQuestions } from '../utils/examQuestions';
 import '../styles/pages/ProficiencyExams.css';
+
+const truncateText = (text, maxLen = 110) => {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  if (s.length <= maxLen) return s;
+  return `${s.slice(0, maxLen - 1)}…`;
+};
 
 const CATEGORY_ICONS = {
   alphabet:             '🔤',
@@ -212,7 +220,10 @@ function ProficiencyExams() {
         </div>
       ) : exams.length > 0 ? (
         <div className="exams-grid">
-          {exams.map((exam) => (
+          {exams.map((exam) => {
+            const playableQuestions = getValidExamQuestions(exam.questions);
+            const sampleQ = playableQuestions[0];
+            return (
             <div key={exam.id} className={`exam-card card ${!exam.isUnlocked ? 'locked' : ''} ${exam.isPassed ? 'passed' : ''}`}>
               <div className="exam-status-badges">
                 {!exam.isUnlocked && <span className="lock-badge">🔒 Locked</span>}
@@ -238,6 +249,12 @@ function ProficiencyExams() {
                     <span className="stat-value">{exam.category}</span>
                   </div>
                 )}
+                <div className="stat">
+                  <span className="stat-label">Instructor:</span>
+                  <span className="stat-value">
+                    {(exam.instructor || exam.instructorName || '').trim() || '—'}
+                  </span>
+                </div>
                 {exam.passingScore && (
                   <div className="stat">
                     <span className="stat-label">Passing Score:</span>
@@ -247,7 +264,7 @@ function ProficiencyExams() {
                 <div className="stat">
                   <span className="stat-label">Questions:</span>
                   <span className="stat-value">
-                    {exam.questions?.length || 0}
+                    {playableQuestions.length}
                   </span>
                 </div>
                 {exam.timeLimit && (
@@ -257,6 +274,18 @@ function ProficiencyExams() {
                   </div>
                 )}
               </div>
+
+              {playableQuestions.length > 0 && sampleQ?.question && (
+                <div className="exam-sample-question">
+                  <span className="exam-sample-label">Sample question</span>
+                  <p>{truncateText(sampleQ.question)}</p>
+                </div>
+              )}
+              {playableQuestions.length === 0 && (
+                <div className="exam-no-questions-hint">
+                  No playable questions yet (each needs an answer and at least two options). Edit this exam in Teacher Dashboard → Exams.
+                </div>
+              )}
 
               {!exam.isUnlocked ? (
                 <div className="locked-message">
@@ -273,7 +302,8 @@ function ProficiencyExams() {
                 </Link>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>

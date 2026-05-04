@@ -7,8 +7,8 @@
  *
  * This module is imported by the Node seed script (`seedExams.cjs`).
  *
- * Schema (matches Firestore `exams/{id}` docs + existing `ExamManagement.jsx`):
- *   id, title, description, category, order, passingScore, timeLimit, questions
+ * Schema (matches Firestore `exams/{id}` docs + `ExamManagement.jsx`):
+ *   id, title, description, instructor, category, order, passingScore, timeLimit, questions
  *
  * Each question: { question, answer, options[], imageUrl?, handIcon? }
  */
@@ -94,6 +94,7 @@ const DEFAULT_EXAMS = [
     id: 'exam_alphabet',
     title: 'Proficiency Exam 1: Alphabet',
     description: 'Recognize common ASL letters with clear handshapes. Passing unlocks the next exam.',
+    instructor: 'Signtify Team',
     category: 'alphabet',
     order: 1,
     passingScore: 75,
@@ -104,6 +105,7 @@ const DEFAULT_EXAMS = [
     id: 'exam_greetings',
     title: 'Proficiency Exam 2: Greetings',
     description: 'Core greetings and short phrases you can practice with the in-app camera.',
+    instructor: 'Signtify Team',
     category: 'greetings',
     order: 2,
     passingScore: 75,
@@ -114,6 +116,7 @@ const DEFAULT_EXAMS = [
     id: 'exam_numbers',
     title: 'Proficiency Exam 3: Numbers',
     description: 'Recognize signed numbers 1–5 plus 10 (clear thumb and finger patterns).',
+    instructor: 'Signtify Team',
     category: 'numbers',
     order: 3,
     passingScore: 75,
@@ -124,6 +127,7 @@ const DEFAULT_EXAMS = [
     id: 'exam_daily_conversation',
     title: 'Proficiency Exam 4: Daily Conversation',
     description: 'Essential yes / no / help and thanks—aligned with camera-friendly signs in the app.',
+    instructor: 'Signtify Team',
     category: 'daily-conversation',
     order: 4,
     passingScore: 75,

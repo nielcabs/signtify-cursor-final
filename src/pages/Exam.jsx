@@ -5,6 +5,7 @@ import { db } from '../auth/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { saveExamResult, getUserProfile } from '../auth/firestoreUtils';
 import { resolveSignImageUrl } from '../assets/signImageMap';
+import { getValidExamQuestions } from '../utils/examQuestions';
 import { useToast } from '../components/ui/Toast';
 import ExamCameraVerifier from '../components/ExamCameraVerifier';
 import '../styles/pages/Quiz.css';
@@ -172,7 +173,9 @@ function Exam() {
         const examRef = doc(db, 'exams', examId);
         const examDoc = await getDoc(examRef);
         if (examDoc.exists()) {
-          setExam({ id: examDoc.id, ...examDoc.data() });
+          const data = examDoc.data();
+          const questions = getValidExamQuestions(data.questions);
+          setExam({ id: examDoc.id, ...data, questions });
         } else {
           setError('Exam not found');
         }
@@ -381,7 +384,10 @@ function Exam() {
       <div className="quiz-page">
         <div className="error-container card">
           <h2>⚠️ No Questions Available</h2>
-          <p>This exam doesn't have any questions yet.</p>
+          <p>
+            This exam has no playable questions yet. Each question needs a correct answer and at least two
+            options. Ask a teacher to open <strong>Teacher Dashboard → Exams</strong> and edit this exam.
+          </p>
           <button onClick={() => navigate('/proficiency-exams')}>Return to Exams</button>
         </div>
       </div>
@@ -504,6 +510,11 @@ function Exam() {
     <div className="quiz-page">
       <div className="quiz-header">
         <h1>{exam.title || 'Proficiency Exam'}</h1>
+        {(exam.instructor || exam.instructorName) && (
+          <p className="exam-instructor-sub">
+            Instructor: <strong>{exam.instructor || exam.instructorName}</strong>
+          </p>
+        )}
         <div className="exam-header-badges">
           {bestScore !== null && (
             <div className="best-score-badge">

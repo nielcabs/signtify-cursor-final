@@ -19,6 +19,8 @@ function ExamManagement() {
   const [formData, setFormData] = useState({
     id: '',
     title: '',
+    description: '',
+    instructor: '',
     category: 'alphabet',
     passingScore: 80,
     timeLimit: 30,
@@ -64,6 +66,8 @@ function ExamManagement() {
     setFormData({
       id: '',
       title: '',
+      description: '',
+      instructor: '',
       category: 'alphabet',
       passingScore: 80,
       timeLimit: 30,
@@ -86,6 +90,8 @@ function ExamManagement() {
     setFormData({
       id: exam.id,
       title: exam.title || '',
+      description: exam.description || '',
+      instructor: exam.instructor || exam.instructorName || '',
       category: exam.category || 'alphabet',
       passingScore: exam.passingScore || 80,
       timeLimit: exam.timeLimit || 30,
@@ -109,7 +115,7 @@ function ExamManagement() {
     }
 
     if (!validOptions.includes(currentQuestion.answer)) {
-      toast.warning('The answer must be one of the options');
+      toast.warning('Choose the correct sign in the dropdown — it must match one of the labels you entered');
       return;
     }
 
@@ -165,6 +171,8 @@ function ExamManagement() {
         examId,
         {
           title: formData.title,
+          description: formData.description?.trim() || '',
+          instructor: formData.instructor?.trim() || '',
           category: formData.category,
           passingScore: formData.passingScore,
           timeLimit: formData.timeLimit,
@@ -288,6 +296,27 @@ function ExamManagement() {
               />
             </div>
 
+            <div className="form-group">
+              <label>Description (shown on exam card):</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Short summary for learners"
+                rows={2}
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Instructor / course lead (optional):</label>
+              <input
+                type="text"
+                value={formData.instructor}
+                onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                placeholder="e.g. Ms. Santos or Signtify Team"
+              />
+            </div>
+
             <div className="form-row">
               <div className="form-group">
                 <label>Category:</label>
@@ -354,13 +383,21 @@ function ExamManagement() {
               
               {showAddQuestionForm && (
               <div className="add-question-form">
+                <div className="exam-camera-hint" role="note">
+                  <strong>Camera-based exam</strong>
+                  <p>
+                    Students never tap multiple-choice buttons. They use the webcam to perform the sign.
+                    The fields below define the <em>text prompt</em>, optional reference image, and the <strong>sign labels</strong>{' '}
+                    the app uses to score the camera (one correct label plus a few wrong labels to reduce confusion).
+                  </p>
+                </div>
                 <div className="form-group">
-                  <label>Question:</label>
+                  <label>Question prompt (shown during the exam):</label>
                   <input
                     type="text"
                     value={currentQuestion.question}
                     onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })}
-                    placeholder="Enter question"
+                    placeholder="e.g. How do you sign the number 2?"
                   />
                 </div>
 
@@ -399,16 +436,13 @@ function ExamManagement() {
                 )}
 
                 <div className="form-group">
-                  <label>Options (Select the correct answer):</label>
+                  <label>Sign labels (correct answer + distractors)</label>
+                  <p className="field-hint-text">
+                    Enter at least two labels. These are not on-screen buttons—learners sign the correct one on camera.
+                  </p>
                   {currentQuestion.options.map((option, index) => (
-                    <div key={index} className="option-input-row">
-                      <input
-                        type="radio"
-                        name="correctAnswer"
-                        checked={currentQuestion.answer === option && option !== ''}
-                        onChange={() => setCurrentQuestion({ ...currentQuestion, answer: option })}
-                        disabled={!option.trim()}
-                      />
+                    <div key={index} className="sign-label-row">
+                      <span className="sign-label-index" aria-hidden="true">{index + 1}</span>
                       <input
                         type="text"
                         value={option}
@@ -416,19 +450,40 @@ function ExamManagement() {
                           const newOptions = [...currentQuestion.options];
                           newOptions[index] = e.target.value;
                           const newQuestion = { ...currentQuestion, options: newOptions };
-                          // If this was the selected answer and it's being changed, update the answer
                           if (currentQuestion.answer === option) {
                             newQuestion.answer = e.target.value;
                           }
                           setCurrentQuestion(newQuestion);
                         }}
-                        placeholder={`Option ${index + 1}`}
+                        placeholder={`Label ${index + 1} (e.g. word or letter)`}
                         className="option-input"
                       />
                     </div>
                   ))}
-                  <small style={{ color: '#666', marginTop: '8px', display: 'block' }}>
-                    💡 Fill in the options, then select the correct answer using the radio button
+                  <div className="form-group correct-sign-select">
+                    <label htmlFor="exam-correct-sign">Correct sign to detect (camera must match this label)</label>
+                    <select
+                      id="exam-correct-sign"
+                      value={
+                        currentQuestion.options.some((o) => o === currentQuestion.answer && String(currentQuestion.answer).trim())
+                          ? currentQuestion.answer
+                          : ''
+                      }
+                      onChange={(e) => setCurrentQuestion({ ...currentQuestion, answer: e.target.value })}
+                    >
+                      <option value="">— Choose after typing labels above —</option>
+                      {currentQuestion.options
+                        .map((o, i) => ({ o: String(o).trim(), i }))
+                        .filter(({ o }) => o.length > 0)
+                        .map(({ o, i }) => (
+                          <option key={i} value={currentQuestion.options[i]}>
+                            {o}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <small className="field-hint-text">
+                    The correct label must match how signs are named in the app (e.g. letters A–Z, words like Hello, numbers 1–10).
                   </small>
                 </div>
 
@@ -459,9 +514,9 @@ function ExamManagement() {
                           <img src={q.imageUrl} alt="Question" />
                         </div>
                       )}
-                      <small><strong>Answer:</strong> {q.answer}</small>
+                      <small><strong>Correct sign (camera):</strong> {q.answer}</small>
                       <br />
-                      <small><strong>Options:</strong> {q.options.join(', ')}</small>
+                      <small><strong>All labels:</strong> {q.options.join(', ')}</small>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
                       <button
