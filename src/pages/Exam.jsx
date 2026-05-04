@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { saveExamResult, getUserProfile } from '../auth/firestoreUtils';
 import { resolveSignImageUrl } from '../assets/signImageMap';
 import { useToast } from '../components/ui/Toast';
+import ExamCameraVerifier from '../components/ExamCameraVerifier';
 import '../styles/pages/Quiz.css';
 
 const DEFAULT_PASSING_SCORE = 80;
@@ -54,6 +55,9 @@ function Exam() {
   const timerRef = useRef(null);
   // Prevent double-submit when finishing manually at the same moment the timer ticks to 0
   const finishingRef = useRef(false);
+  const advancingRef = useRef(false);
+  const currentIndexRef = useRef(0);
+  const attemptLengthRef = useRef(0);
 
   // ---- Data loading ----
 
@@ -370,6 +374,32 @@ function Exam() {
   const answeredCount = answers.filter((a) => a !== null).length;
   const timerDanger = timeRemaining !== null && timeRemaining <= 60;
 
+  currentIndexRef.current = currentIndex;
+  attemptLengthRef.current = attempt.length;
+
+  const handleCameraCorrect = useCallback(() => {
+    if (!attempt || showResult || advancingRef.current) return;
+    const idx = currentIndexRef.current;
+    const q = attempt[idx];
+    if (!q) return;
+
+    advancingRef.current = true;
+    setAnswers((prev) => {
+      const next = [...prev];
+      next[idx] = q.answer;
+      return next;
+    });
+
+    setTimeout(() => {
+      if (idx < attemptLengthRef.current - 1) {
+        setCurrentIndex((prev) => Math.min(prev + 1, attemptLengthRef.current - 1));
+      } else {
+        finishExam({ auto: false });
+      }
+      advancingRef.current = false;
+    }, 700);
+  }, [attempt, finishExam, showResult]);
+
   return (
     <div className="quiz-page">
       <div className="quiz-header">
@@ -423,12 +453,20 @@ function Exam() {
           <h2>{question.question}</h2>
         </div>
 
+        <ExamCameraVerifier
+          expectedSign={question.answer}
+          category={exam.category}
+          onCorrectDetected={handleCameraCorrect}
+          disabled={showResult}
+        />
+
         <div className="options-grid">
           {question.options.map((option, index) => (
             <button
               key={`${currentIndex}-${index}-${option}`}
               className={`option-button ${selectedAnswer === option ? 'selected' : ''}`}
               onClick={() => handleAnswer(option)}
+              disabled={advancingRef.current}
             >
               {option}
             </button>
