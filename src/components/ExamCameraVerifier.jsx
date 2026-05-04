@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as fp from 'fingerpose';
 import Handsigns from '../../handsign-tensorflow-master/components/handsigns/index.js';
 import { getFoldedHandScore, getLocalLetterHeuristic } from '../utils/liveLetterHeuristics.js';
-import { inferLocalDetectionMode } from '../utils/inferLocalDetectionMode.js';
+import { resolvePreviewScope } from '../utils/inferLocalDetectionMode.js';
 import { useToast } from './ui/Toast';
 
 const SEQUENCE_LENGTH = 30;
@@ -30,6 +30,8 @@ const normalize = (value) => String(value || '').toLowerCase().trim().replace(/\
 function ExamCameraVerifier({
   expectedSign,
   questionText = '',
+  /** Exam "Category" from teacher form — filters live preview (Detected) by alphabet vs numbers vs words */
+  examCategory = '',
   onCorrectDetected,
   disabled = false
 }) {
@@ -56,10 +58,10 @@ function ExamCameraVerifier({
   const [detectionStatus, setDetectionStatus] = useState('Camera ready');
   const [detectedSign, setDetectedSign] = useState('');
   const [confidence, setConfidence] = useState(0);
-  /** Letters / numbers / words pipelines — driven by expected sign, not exam category. */
-  const mode = useMemo(
-    () => inferLocalDetectionMode(expectedSign, questionText),
-    [expectedSign, questionText]
+  /** Live readout follows exam Category dropdown (alphabet → letters only, etc.). */
+  const previewScope = useMemo(
+    () => resolvePreviewScope(examCategory, expectedSign, questionText),
+    [examCategory, expectedSign, questionText]
   );
 
   const normalizePrediction = useCallback((value) => {
@@ -336,11 +338,18 @@ function ExamCameraVerifier({
     const fp = getExamFingerposePrediction();
 
     const previewPool = [];
-    if (num) previewPool.push(num);
-    if (letter) previewPool.push(letter);
-    if (word) previewPool.push(word);
-    if (fp && fp.confidence >= FINGERPOSE_PREVIEW_MIN) {
-      previewPool.push({ sign: fp.sign, confidence: fp.confidence });
+    if (previewScope === 'numbers') {
+      if (num) previewPool.push(num);
+    } else if (previewScope === 'letters') {
+      if (letter) previewPool.push(letter);
+      if (fp && fp.confidence >= FINGERPOSE_PREVIEW_MIN) {
+        previewPool.push({ sign: fp.sign, confidence: fp.confidence });
+      }
+    } else {
+      if (word) previewPool.push(word);
+      if (fp && fp.confidence >= FINGERPOSE_PREVIEW_MIN) {
+        previewPool.push({ sign: fp.sign, confidence: fp.confidence });
+      }
     }
 
     if (previewPool.length && !correctLockRef.current) {
@@ -419,6 +428,7 @@ function ExamCameraVerifier({
     getLocalNumberPrediction,
     getLocalWordHeuristicExam,
     normalizePrediction,
+    previewScope,
   ]);
 
   const tryLocalFallback = useCallback(() => tryUnifiedExpectedDetection(), [tryUnifiedExpectedDetection]);
@@ -521,19 +531,19 @@ function ExamCameraVerifier({
       return;
     }
     // All exam modes use local palm heuristics + voting (same idea as Live Translate). No Render /predict.
-    const minFrames = mode === 'words' ? 8 : 2;
+    const minFrames = previewScope === 'words' ? 8 : 2;
     if (sequenceRef.current.length < minFrames) {
       setDetectionStatus(`Collecting frames ${sequenceRef.current.length}/${minFrames}`);
       return;
     }
-    if (mode === 'words') {
+    if (previewScope === 'words') {
       setDetectionStatus('Local detection — hold the handshape steady (small side-to-side motion helps for hello/goodbye)');
-    } else if (mode === 'letters') {
+    } else if (previewScope === 'letters') {
       setDetectionStatus('Local detection — hold the letter shape steady');
     } else {
       setDetectionStatus('Local detection — hold the number shape steady');
     }
-  }, [mode, tryLocalFallback]);
+  }, [previewScope, tryLocalFallback]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -627,6 +637,18 @@ function ExamCameraVerifier({
       <p style={{ marginTop: 0, color: '#666' }}>
         Show this sign: <strong>{expectedSign}</strong>
       </p>
+      <p style={{ margin: '0.35rem 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+        Live readout:{' '}
+        {previewScope === 'letters' && <>letters only (matches <strong>Alphabet</strong> exams).</>}
+        {previewScope === 'numbers' && <>numbers only (matches <strong>Numbers</strong> exams).</>}
+        {previewScope === 'words' && <>words / phrases (matches greetings & conversation categories).</>}
+        Scoring still accepts the correct label below regardless of category.
+      </p>
+      {previewScope === 'letters' && (
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: '#92400e', lineHeight: 1.45, background: '#fffbeb', padding: '0.5rem 0.65rem', borderRadius: 8, border: '1px solid #fde68a' }}>
+          Letter shapes are easy to confuse with number shapes on camera (e.g. an open hand vs ASL <strong>A</strong>, which is a fist). Use good lighting and match the exact letter handshape.
+        </p>
+      )}
 
       <div style={{ position: 'relative', background: '#111', borderRadius: '10px', overflow: 'hidden', minHeight: '220px' }}>
         {!isCameraActive && (

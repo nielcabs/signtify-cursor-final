@@ -28,3 +28,26 @@ export function inferLocalDetectionMode(expectedSign, questionText = '') {
 
   return 'words';
 }
+
+/**
+ * Maps Teacher Dashboard "Category" to what we show in the live preview (letters vs numbers vs words).
+ * `comprehensive` / unknown → no mapping (caller falls back to inferLocalDetectionMode).
+ */
+export function mapExamCategoryToPreviewScope(category) {
+  const c = String(category || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-');
+  if (!c || c === 'comprehensive') return null;
+  if (c === 'alphabet') return 'letters';
+  if (c === 'numbers') return 'numbers';
+  if (['greetings', 'daily-conversation', 'common'].includes(c)) return 'words';
+  return null;
+}
+
+/** Preview follows exam category when set; otherwise the expected sign. */
+export function resolvePreviewScope(examCategory, expectedSign, questionText) {
+  const mapped = mapExamCategoryToPreviewScope(examCategory);
+  if (mapped) return mapped;
+  return inferLocalDetectionMode(expectedSign, questionText);
+}

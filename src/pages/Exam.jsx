@@ -544,6 +544,7 @@ function Exam() {
         <ExamCameraVerifier
           expectedSign={cameraExpectedSign}
           questionText={question.question}
+          examCategory={exam.category || ''}
           onCorrectDetected={handleCameraCorrect}
           disabled={showResult}
         />
