@@ -4,7 +4,6 @@ import './App.css';
 
 // Import components
 import Navbar from './components/Navbar';
-import AnnouncementToastListener from './components/AnnouncementToastListener';
 import { ToastProvider } from './components/ui/Toast';
 
 // Import auth
@@ -75,7 +74,6 @@ function App() {
         <ToastProvider>
         <TutorialProvider>
           <TutorialBootstrapper />
-          <AnnouncementToastListener />
           <div className="app">
             <Navbar />
             <TutorialOverlay />

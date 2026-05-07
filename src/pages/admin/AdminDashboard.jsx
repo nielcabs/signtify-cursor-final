@@ -121,7 +121,7 @@ function AdminDashboard() {
           <div className="modal-content card" onClick={(e) => e.stopPropagation()}>
             <h2>📣 Send Announcement</h2>
             <p style={{ color: 'var(--color-text-muted, #6b7280)', marginBottom: '1rem' }}>
-              Each user gets a <strong>pop-up notification</strong> and an entry in their notification bell.
+              Each user gets an entry in their <strong>notification bell</strong>.
             </p>
             <div className="form-group">
               <label>Title</label>
