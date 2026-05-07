@@ -28,7 +28,6 @@ function QuizManagement() {
   const [currentQuestion, setCurrentQuestion] = useState({
     question: '',
     answer: '',
-    options: ['', '', '', ''],
     imageUrl: '',
     handIcon: ''
   });
@@ -62,7 +61,6 @@ function QuizManagement() {
     setCurrentQuestion({
       question: '',
       answer: '',
-      options: ['', '', '', ''],
       imageUrl: '',
       handIcon: ''
     });
@@ -84,31 +82,30 @@ function QuizManagement() {
   };
 
   const handleAddQuestion = () => {
-    if (!currentQuestion.question || !currentQuestion.answer) {
-      toast.warning('Please fill in question and answer');
-      return;
-    }
-
-    const validOptions = currentQuestion.options.filter(opt => opt.trim() !== '');
-    if (validOptions.length < 2) {
-      toast.warning('Please provide at least 2 options');
-      return;
-    }
-
-    if (!validOptions.includes(currentQuestion.answer)) {
-      toast.warning('The answer must be one of the options');
+    const prompt = currentQuestion.question.trim();
+    const ans = currentQuestion.answer.trim();
+    if (!prompt || !ans) {
+      toast.warning('Fill in the question prompt and the correct sign to detect');
       return;
     }
 
     setFormData({
       ...formData,
-      questions: [...formData.questions, { ...currentQuestion, options: validOptions }]
+      questions: [
+        ...formData.questions,
+        {
+          question: prompt,
+          answer: ans,
+          options: [ans],
+          imageUrl: (currentQuestion.imageUrl || '').trim(),
+          handIcon: currentQuestion.handIcon || '',
+        }
+      ]
     });
 
     setCurrentQuestion({
       question: '',
       answer: '',
-      options: ['', '', '', ''],
       imageUrl: '',
       handIcon: ''
     });
@@ -126,7 +123,6 @@ function QuizManagement() {
     setCurrentQuestion({
       question: questionToEdit.question,
       answer: questionToEdit.answer,
-      options: questionToEdit.options.length === 4 ? questionToEdit.options : [...questionToEdit.options, '', '', '', ''].slice(0, 4),
       imageUrl: questionToEdit.imageUrl || '',
       handIcon: questionToEdit.handIcon || ''
     });
@@ -155,7 +151,10 @@ function QuizManagement() {
           title: formData.title,
           category: formData.category,
           difficulty: formData.difficulty,
-          questions: formData.questions
+          questions: formData.questions.map((q) => {
+            const ans = String(q.answer || '').trim();
+            return { ...q, answer: ans, options: ans ? [ans] : [] };
+          })
         },
         currentUser?.uid,
         currentUser?.email
@@ -373,37 +372,25 @@ function QuizManagement() {
                   </div>
                 )}
 
+                <div className="exam-camera-hint" role="note">
+                  <strong>Camera-based quiz</strong>
+                  <p>
+                    Learners perform the sign on camera. Enter the one label the detector should match (e.g. <strong>A</strong>, <strong>Hello</strong>, <strong>5</strong>).
+                  </p>
+                </div>
+
                 <div className="form-group">
-                  <label>Options (Select the correct answer):</label>
-                  {currentQuestion.options.map((option, index) => (
-                    <div key={index} className="option-input-row">
-                      <input
-                        type="radio"
-                        name="correctAnswer"
-                        checked={currentQuestion.answer === option && option !== ''}
-                        onChange={() => setCurrentQuestion({ ...currentQuestion, answer: option })}
-                        disabled={!option.trim()}
-                      />
-                      <input
-                        type="text"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...currentQuestion.options];
-                          newOptions[index] = e.target.value;
-                          const newQuestion = { ...currentQuestion, options: newOptions };
-                          // If this was the selected answer and it's being changed, update the answer
-                          if (currentQuestion.answer === option) {
-                            newQuestion.answer = e.target.value;
-                          }
-                          setCurrentQuestion(newQuestion);
-                        }}
-                        placeholder={`Option ${index + 1}`}
-                        className="option-input"
-                      />
-                    </div>
-                  ))}
-                  <small style={{ color: '#666', marginTop: '8px', display: 'block' }}>
-                    💡 Fill in the options, then select the correct answer using the radio button
+                  <label htmlFor="quiz-correct-sign-text">Correct sign to detect</label>
+                  <input
+                    id="quiz-correct-sign-text"
+                    type="text"
+                    value={currentQuestion.answer}
+                    onChange={(e) => setCurrentQuestion({ ...currentQuestion, answer: e.target.value })}
+                    placeholder="e.g. A, Hello, 5"
+                    autoComplete="off"
+                  />
+                  <small className="field-hint-text">
+                    Must match how the app names this sign (letters, common words, or numbers 0–10). This is the only label used for scoring.
                   </small>
                 </div>
 
@@ -434,9 +421,7 @@ function QuizManagement() {
                           <img src={q.imageUrl} alt="Question" />
                         </div>
                       )}
-                      <small><strong>Answer:</strong> {q.answer}</small>
-                      <br />
-                      <small><strong>Options:</strong> {q.options.join(', ')}</small>
+                      <small><strong>Correct sign (camera):</strong> {q.answer}</small>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
                       <button

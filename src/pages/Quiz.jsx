@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../auth/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { saveQuizResult, getUserProfile } from '../auth/firestoreUtils';
 import { resolveSignImageUrl } from '../assets/signImageMap';
+import ExamCameraVerifier from '../components/ExamCameraVerifier';
 import '../styles/pages/Quiz.css';
 
 function Quiz() {
@@ -18,11 +19,11 @@ function Quiz() {
   const [bestScore, setBestScore] = useState(null);
   
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState('');
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
-  const [answers, setAnswers] = useState([]);
+  const [answers, setAnswers] = useState([]); // { question: idx, correct: true }
   const [saving, setSaving] = useState(false);
+  const advancingRef = useRef(false);
 
   useEffect(() => {
     loadQuiz();
@@ -70,46 +71,45 @@ function Quiz() {
     }
   };
 
-  const handleAnswer = (answer) => {
-    setSelectedAnswer(answer);
-  };
-
-  const handleNext = async () => {
-    if (!quiz || !quiz.questions) return;
-    
-    const isCorrect = selectedAnswer === quiz.questions[currentQuestion].answer;
-    const newAnswers = [...answers, { question: currentQuestion, correct: isCorrect }];
-    setAnswers(newAnswers);
-    
-    const newScore = isCorrect ? score + 1 : score;
-    if (isCorrect) {
-      setScore(newScore);
-    }
-
-    if (currentQuestion < quiz.questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-      setSelectedAnswer('');
-    } else {
-      setShowResult(true);
-      // Save quiz result to Firestore
-      if (currentUser) {
-        setSaving(true);
-        try {
-          await saveQuizResult(currentUser.uid, quizId, newScore, quiz.questions.length, quiz.category);
-          // Reload best score after saving
-          await loadBestScore();
-        } catch (error) {
-          console.error('Error saving quiz result:', error);
-        } finally {
-          setSaving(false);
-        }
+  const finishQuiz = useCallback(async (finalScore) => {
+    setShowResult(true);
+    if (currentUser) {
+      setSaving(true);
+      try {
+        await saveQuizResult(currentUser.uid, quizId, finalScore, quiz.questions.length, quiz.category);
+        await loadBestScore();
+      } catch (error) {
+        console.error('Error saving quiz result:', error);
+      } finally {
+        setSaving(false);
       }
     }
-  };
+  }, [currentUser, quiz?.category, quiz?.questions?.length, quizId]);
+
+  const handleCameraCorrect = useCallback(() => {
+    if (!quiz?.questions?.length || showResult || advancingRef.current) return;
+    advancingRef.current = true;
+
+    setScore((prev) => {
+      const nextScore = prev + 1;
+      const isLast = currentQuestion >= quiz.questions.length - 1;
+      // Defer navigation/state transitions so we don't finish inside state setter.
+      setTimeout(() => {
+        if (!isLast) {
+          setCurrentQuestion((q) => q + 1);
+        } else {
+          finishQuiz(nextScore);
+        }
+        advancingRef.current = false;
+      }, 650);
+      return nextScore;
+    });
+
+    setAnswers((prev) => [...prev, { question: currentQuestion, correct: true }]);
+  }, [currentQuestion, finishQuiz, quiz, showResult]);
 
   const handleRetry = () => {
     setCurrentQuestion(0);
-    setSelectedAnswer('');
     setScore(0);
     setShowResult(false);
     setAnswers([]);
@@ -253,25 +253,18 @@ function Quiz() {
           <h2>{quiz.questions[currentQuestion].question}</h2>
         </div>
 
-        <div className="options-grid">
-          {quiz.questions[currentQuestion].options.map((option, index) => (
-            <button
-              key={index}
-              className={`option-button ${selectedAnswer === option ? 'selected' : ''}`}
-              onClick={() => handleAnswer(option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        <ExamCameraVerifier
+          expectedSign={quiz.questions[currentQuestion].answer}
+          questionText={quiz.questions[currentQuestion].question}
+          examCategory={quiz.category || ''}
+          onCorrectDetected={handleCameraCorrect}
+          disabled={showResult}
+        />
 
         <div className="quiz-actions">
-          <button 
-            onClick={handleNext} 
-            disabled={!selectedAnswer}
-          >
-            {currentQuestion < quiz.questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
-          </button>
+          <p style={{ margin: 0, color: '#666', textAlign: 'center', width: '100%' }}>
+            Camera-only mode: perform the correct sign to continue automatically.
+          </p>
         </div>
       </div>
     </div>
