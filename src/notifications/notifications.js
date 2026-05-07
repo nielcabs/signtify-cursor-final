@@ -120,11 +120,13 @@ export const getUserNotifications = async (uid, { limit = 30 } = {}) => {
     const q = query(
       collection(db, COLLECTION),
       where('userId', '==', uid),
-      orderBy('createdAt', 'desc'),
       firestoreLimit(limit),
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const toMillis = (ts) => ts?.toMillis?.() ?? (ts?.seconds ? ts.seconds * 1000 : 0);
+    list.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+    return list;
   } catch (err) {
     console.warn('getUserNotifications failed:', err?.message || err);
     return [];
@@ -140,13 +142,14 @@ export const subscribeToUserNotifications = (uid, callback, { limit = 30 } = {})
     const q = query(
       collection(db, COLLECTION),
       where('userId', '==', uid),
-      orderBy('createdAt', 'desc'),
       firestoreLimit(limit),
     );
     return onSnapshot(
       q,
       (snap) => {
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const toMillis = (ts) => ts?.toMillis?.() ?? (ts?.seconds ? ts.seconds * 1000 : 0);
+        list.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
         callback(list);
       },
       (err) => {
