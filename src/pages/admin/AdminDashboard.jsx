@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getAllUsers } from '../../auth/adminUtils';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { broadcastNotification, NOTIFICATION_TYPES } from '../../notifications/notifications';
+import { createAnnouncement } from '../../notifications/announcements';
 import '../../styles/pages/AdminDashboard.css';
 
 function AdminDashboard() {
@@ -41,23 +41,15 @@ function AdminDashboard() {
       toast.warning('Please provide both a title and a message');
       return;
     }
-    if (!activeUserIds?.length) {
-      toast.error('No active users loaded. Refresh the page and try again.');
-      return;
-    }
     try {
       setSending(true);
-      const sent = await broadcastNotification(activeUserIds, {
-        type: NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT,
+      await createAnnouncement({
         title: announceTitle.trim(),
         message: announceMessage.trim(),
         link: announceLink.trim() || null,
         createdBy: currentUser?.uid || null,
       });
-      if (!sent) {
-        throw new Error('No announcements were sent (0 recipients). Check Firestore rules for "notifications".');
-      }
-      toast.success(`Announcement sent to ${sent} user${sent === 1 ? '' : 's'}`);
+      toast.success('Announcement posted');
       setShowAnnounce(false);
       setAnnounceTitle('');
       setAnnounceMessage('');

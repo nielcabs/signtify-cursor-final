@@ -357,6 +357,7 @@ export const saveQuiz = async (quizId, quizData, adminId = null, adminEmail = nu
     
     await setDoc(quizRef, {
       ...quizData,
+      ...(!isUpdate ? { createdAt: serverTimestamp(), createdBy: adminId || null } : {}),
       updatedAt: serverTimestamp()
     }, { merge: true });
     
@@ -443,6 +444,7 @@ export const saveExam = async (examId, examData, adminId = null, adminEmail = nu
     
     await setDoc(examRef, {
       ...examData,
+      ...(!isUpdate ? { createdAt: serverTimestamp(), createdBy: adminId || null } : {}),
       updatedAt: serverTimestamp()
     }, { merge: true });
     
@@ -663,6 +665,7 @@ export const saveLesson = async (lessonId, lessonData, adminId = null, adminEmai
     
     await setDoc(lessonRef, {
       ...lessonData,
+      ...(!isUpdate ? { createdAt: serverTimestamp(), createdBy: adminId || null } : {}),
       updatedAt: serverTimestamp()
     }, { merge: true });
     
