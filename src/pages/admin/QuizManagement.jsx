@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllQuizzes, saveQuiz, deleteQuiz } from '../../auth/adminUtils';
+import { getAllQuizzes, saveQuiz, deleteQuiz, getAllUsers } from '../../auth/adminUtils';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { broadcastNotification, NOTIFICATION_TYPES } from '../../notifications/notifications';
 import '../../styles/pages/AdminManagement.css';
 
 function QuizManagement() {
@@ -145,6 +146,7 @@ function QuizManagement() {
     }
 
     const quizId = editingQuiz ? editingQuiz.id : formData.id || `quiz_${Date.now()}`;
+    const isNew = !editingQuiz;
 
     try {
       await saveQuiz(
@@ -158,6 +160,24 @@ function QuizManagement() {
         currentUser?.uid,
         currentUser?.email
       );
+
+      // Notify all active users when a new quiz is created (non-blocking).
+      if (isNew) {
+        try {
+          const usersList = await getAllUsers({ includeArchived: false });
+          const uids = usersList.map((u) => u.id).filter(Boolean);
+          await broadcastNotification(uids, {
+            type: NOTIFICATION_TYPES.INFO,
+            title: `📝 New quiz available: ${formData.title.trim()}`,
+            message: 'A new quiz was added. Try it to test your progress.',
+            link: '/quizzes',
+            createdBy: currentUser?.uid || null,
+            meta: { quizId, category: formData.category, difficulty: formData.difficulty },
+          });
+        } catch (e) {
+          console.warn('Quiz create broadcast failed:', e?.message || e);
+        }
+      }
       
       await loadQuizzes();
       setShowForm(false);

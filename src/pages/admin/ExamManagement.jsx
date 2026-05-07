@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllExams, saveExam, deleteExam } from '../../auth/adminUtils';
+import { getAllExams, saveExam, deleteExam, getAllUsers } from '../../auth/adminUtils';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { broadcastNotification, NOTIFICATION_TYPES } from '../../notifications/notifications';
 import '../../styles/pages/AdminManagement.css';
 
 const EXAM_CATEGORY_OPTIONS = [
@@ -173,6 +174,7 @@ function ExamManagement() {
     }
 
     const examId = editingExam ? editingExam.id : formData.id || `exam_${Date.now()}`;
+    const isNew = !editingExam;
 
     try {
       const normalizedQuestions = formData.questions.map((q) => {
@@ -199,6 +201,24 @@ function ExamManagement() {
         currentUser?.uid,
         currentUser?.email
       );
+
+      // Notify all active users when a new exam is created (non-blocking).
+      if (isNew) {
+        try {
+          const usersList = await getAllUsers({ includeArchived: false });
+          const uids = usersList.map((u) => u.id).filter(Boolean);
+          await broadcastNotification(uids, {
+            type: NOTIFICATION_TYPES.INFO,
+            title: `🎓 New exam available: ${formData.title.trim()}`,
+            message: 'A new proficiency exam was added. You can take it now.',
+            link: '/proficiency-exams',
+            createdBy: currentUser?.uid || null,
+            meta: { examId, category: formData.category },
+          });
+        } catch (e) {
+          console.warn('Exam create broadcast failed:', e?.message || e);
+        }
+      }
       
       await loadExams();
       setShowForm(false);

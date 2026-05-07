@@ -126,6 +126,9 @@
 .management-table {
   padding: 0;
   overflow-x: auto;
+  /* Prevent an inner vertical scrollbar in management pages (page should scroll instead). */
+  overflow-y: visible;
+  max-height: none;
 }
 
 .management-table table {

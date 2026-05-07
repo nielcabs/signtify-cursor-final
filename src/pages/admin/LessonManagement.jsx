@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllLessons, saveLesson, deleteLesson } from '../../auth/adminUtils';
+import { getAllLessons, saveLesson, deleteLesson, getAllUsers } from '../../auth/adminUtils';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { broadcastNotification, NOTIFICATION_TYPES } from '../../notifications/notifications';
 import '../../styles/pages/AdminManagement.css';
 
 function LessonManagement() {
@@ -166,6 +167,7 @@ function LessonManagement() {
     }
 
     const lessonId = editingLesson ? editingLesson.id : formData.id || `lesson_${Date.now()}`;
+    const isNew = !editingLesson;
 
     try {
       await saveLesson(
@@ -181,6 +183,24 @@ function LessonManagement() {
         currentUser?.uid,
         currentUser?.email
       );
+
+      // Notify all active users when a new lesson is created (non-blocking).
+      if (isNew) {
+        try {
+          const usersList = await getAllUsers({ includeArchived: false });
+          const uids = usersList.map((u) => u.id).filter(Boolean);
+          await broadcastNotification(uids, {
+            type: NOTIFICATION_TYPES.INFO,
+            title: `📚 New lesson available: ${formData.title.trim()}`,
+            message: 'A new lesson was added. Start learning now.',
+            link: '/lessons/alphabet',
+            createdBy: currentUser?.uid || null,
+            meta: { lessonId, category: formData.category },
+          });
+        } catch (e) {
+          console.warn('Lesson create broadcast failed:', e?.message || e);
+        }
+      }
       
       await loadLessons();
       setShowForm(false);
