@@ -28,6 +28,7 @@ function iconFor(type) {
   switch (type) {
     case 'achievement':        return '🏆';
     case 'lesson_completed':   return '✅';
+    case 'quiz_result':        return '📝';
     case 'exam_result':        return '🎓';
     case 'admin_announcement': return '📣';
     case 'account':            return '👤';

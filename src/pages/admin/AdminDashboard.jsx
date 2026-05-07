@@ -41,6 +41,10 @@ function AdminDashboard() {
       toast.warning('Please provide both a title and a message');
       return;
     }
+    if (!activeUserIds?.length) {
+      toast.error('No active users loaded. Refresh the page and try again.');
+      return;
+    }
     try {
       setSending(true);
       const sent = await broadcastNotification(activeUserIds, {
@@ -50,6 +54,9 @@ function AdminDashboard() {
         link: announceLink.trim() || null,
         createdBy: currentUser?.uid || null,
       });
+      if (!sent) {
+        throw new Error('No announcements were sent (0 recipients). Check Firestore rules for "notifications".');
+      }
       toast.success(`Announcement sent to ${sent} user${sent === 1 ? '' : 's'}`);
       setShowAnnounce(false);
       setAnnounceTitle('');
@@ -57,7 +64,7 @@ function AdminDashboard() {
       setAnnounceLink('');
     } catch (err) {
       console.error(err);
-      toast.error('Failed to send announcement');
+      toast.error(err?.message || 'Failed to send announcement');
     } finally {
       setSending(false);
     }

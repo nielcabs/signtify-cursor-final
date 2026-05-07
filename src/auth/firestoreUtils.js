@@ -377,6 +377,16 @@ export const saveQuizResult = async (uid, quizId, score, totalQuestions, lessonC
     // Note: Quiz just needs to be taken, no score requirement
     await checkAndCompleteLesson(uid, lessonCategory, 'quiz', quizId, percentage);
 
+    // Notify the user (non-blocking) — in-app bell notification
+    createNotification({
+      userId: uid,
+      type: NOTIFICATION_TYPES.QUIZ_RESULT,
+      title: `📝 Quiz completed: ${quizTitle}`,
+      message: `You scored ${percentage}%.`,
+      link: '/quizzes',
+      meta: { quizId, lessonCategory, percentage },
+    });
+
     // Calculate and update average quiz score
     const userDoc = await getDoc(userRef);
     if (userDoc.exists()) {
@@ -693,6 +703,18 @@ export const checkAndCompleteLesson = async (uid, lessonCategory, assessmentType
         'progress.lessonsCompleted': arrayUnion(lessonId),
         'progress.totalPoints': increment(50),
         updatedAt: serverTimestamp()
+      });
+
+      // Notify the user (non-blocking) — in-app bell notification
+      createNotification({
+        userId: uid,
+        type: NOTIFICATION_TYPES.LESSON_COMPLETED,
+        title: `${lessonTitle || 'Lesson'} completed`,
+        message: hasPassedExam
+          ? 'Great job — you finished the lesson and passed the proficiency exam.'
+          : 'Great job — you finished the lesson.',
+        link: '/quizzes',
+        meta: { lessonId, lessonCategory, assessmentType, assessmentId },
       });
 
       // Log user activity

@@ -36,6 +36,7 @@ const COLLECTION = 'notifications';
 export const NOTIFICATION_TYPES = {
   ACHIEVEMENT: 'achievement',
   LESSON_COMPLETED: 'lesson_completed',
+  QUIZ_RESULT: 'quiz_result',
   EXAM_RESULT: 'exam_result',
   ADMIN_ANNOUNCEMENT: 'admin_announcement',
   ACCOUNT: 'account',
@@ -83,7 +84,9 @@ export const createNotification = async ({
  * Caller provides the list of uids.
  */
 export const broadcastNotification = async (uids, payload) => {
-  if (!Array.isArray(uids) || uids.length === 0) return 0;
+  if (!Array.isArray(uids) || uids.length === 0) {
+    throw new Error('No recipients (uids) provided');
+  }
   const batch = writeBatch(db);
   uids.forEach((uid) => {
     const ref = doc(collection(db, COLLECTION));
@@ -104,7 +107,7 @@ export const broadcastNotification = async (uids, payload) => {
     return uids.length;
   } catch (err) {
     console.warn('broadcastNotification failed:', err?.message || err);
-    return 0;
+    throw err;
   }
 };
 
