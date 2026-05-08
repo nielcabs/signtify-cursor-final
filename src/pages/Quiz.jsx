@@ -93,7 +93,7 @@ function Quiz() {
     advancingRef.current = true;
 
     const q = quiz.questions[currentQuestion];
-    if (q?.answer) toast.success(`Correct: ${q.answer}`, { duration: 1200 });
+    if (q?.answer) toast.success(`✅ Correct! (${q.answer})`, { duration: 2500 });
 
     setScore((prev) => {
       const nextScore = prev + 1;
@@ -106,7 +106,7 @@ function Quiz() {
           finishQuiz(nextScore);
         }
         advancingRef.current = false;
-      }, 650);
+      }, 1200);
       return nextScore;
     });
 

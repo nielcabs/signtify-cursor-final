@@ -58,6 +58,8 @@ function ExamCameraVerifier({
   const [detectionStatus, setDetectionStatus] = useState('Camera ready');
   const [detectedSign, setDetectedSign] = useState('');
   const [confidence, setConfidence] = useState(0);
+  const [correctFlash, setCorrectFlash] = useState(false);
+  const correctFlashTimerRef = useRef(null);
   /** Live readout follows exam Category dropdown (alphabet → letters only, etc.). */
   const previewScope = useMemo(
     () => resolvePreviewScope(examCategory, expectedSign, questionText),
@@ -312,6 +314,9 @@ function ExamCameraVerifier({
 
     if (!correctLockRef.current && isExpected) {
       correctLockRef.current = true;
+      setCorrectFlash(true);
+      if (correctFlashTimerRef.current) clearTimeout(correctFlashTimerRef.current);
+      correctFlashTimerRef.current = setTimeout(() => setCorrectFlash(false), 1100);
       setDetectionStatus('Correct sign! Moving to next question...');
       onCorrectDetected?.(predicted, conf);
     }
@@ -624,6 +629,9 @@ function ExamCameraVerifier({
   }, [loadMediaPipeScripts, runPrediction, toast]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
+  useEffect(() => () => {
+    if (correctFlashTimerRef.current) clearTimeout(correctFlashTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (disabled && isCameraActive) {
@@ -637,6 +645,11 @@ function ExamCameraVerifier({
       <p style={{ marginTop: 0, color: '#666' }}>
         Show this sign: <strong>{expectedSign}</strong>
       </p>
+      {correctFlash && (
+        <div className="exam-camera-correct-banner" role="status" aria-live="polite">
+          ✅ Correct! Proceeding to the next question…
+        </div>
+      )}
       <p style={{ margin: '0.35rem 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
         Live readout:{' '}
         {previewScope === 'letters' && <>letters only (matches <strong>Alphabet</strong> exams).</>}

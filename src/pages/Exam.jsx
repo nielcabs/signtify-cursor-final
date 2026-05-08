@@ -318,7 +318,7 @@ function Exam() {
     if (!q) return;
 
     advancingRef.current = true;
-    toast.success(`Correct: ${q.answer}`, { duration: 1200 });
+    toast.success(`✅ Correct! (${q.answer})`, { duration: 2500 });
     setAnswers((prev) => {
       const next = [...prev];
       next[idx] = q.answer;
@@ -333,7 +333,7 @@ function Exam() {
         finishExam({ auto: false });
       }
       advancingRef.current = false;
-    }, 700);
+    }, 1200);
   }, [attempt, finishExam, showResult, toast]);
 
   // ---- Rendering ----
