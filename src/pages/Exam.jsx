@@ -318,6 +318,7 @@ function Exam() {
     if (!q) return;
 
     advancingRef.current = true;
+    toast.success(`Correct: ${q.answer}`, { duration: 1200 });
     setAnswers((prev) => {
       const next = [...prev];
       next[idx] = q.answer;
@@ -333,7 +334,7 @@ function Exam() {
       }
       advancingRef.current = false;
     }, 700);
-  }, [attempt, finishExam, showResult]);
+  }, [attempt, finishExam, showResult, toast]);
 
   // ---- Rendering ----
 

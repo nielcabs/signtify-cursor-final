@@ -6,12 +6,14 @@ import { useAuth } from '../auth/AuthContext';
 import { saveQuizResult, getUserProfile } from '../auth/firestoreUtils';
 import { resolveSignImageUrl } from '../assets/signImageMap';
 import ExamCameraVerifier from '../components/ExamCameraVerifier';
+import { useToast } from '../components/ui/Toast';
 import '../styles/pages/Quiz.css';
 
 function Quiz() {
   const { quizId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const toast = useToast();
   
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -90,6 +92,9 @@ function Quiz() {
     if (!quiz?.questions?.length || showResult || advancingRef.current) return;
     advancingRef.current = true;
 
+    const q = quiz.questions[currentQuestion];
+    if (q?.answer) toast.success(`Correct: ${q.answer}`, { duration: 1200 });
+
     setScore((prev) => {
       const nextScore = prev + 1;
       const isLast = currentQuestion >= quiz.questions.length - 1;
@@ -106,7 +111,7 @@ function Quiz() {
     });
 
     setAnswers((prev) => [...prev, { question: currentQuestion, correct: true }]);
-  }, [currentQuestion, finishQuiz, quiz, showResult]);
+  }, [currentQuestion, finishQuiz, quiz, showResult, toast]);
 
   const handleRetry = () => {
     setCurrentQuestion(0);
